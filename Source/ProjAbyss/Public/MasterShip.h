@@ -58,6 +58,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     class UInputAction* TurnAction;
 
+    // The "Interact" Action (used to exit the ship)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* InteractAction;
+
     // -- SETTINGS --
     UPROPERTY(EditAnywhere, Category = "Buoyancy")
     float FloatForce = 40000.0f;
@@ -84,7 +88,12 @@ private:
     // Updated Functions for Enhanced Input
     void MoveForward(const FInputActionValue& Value);
     void TurnRight(const FInputActionValue& Value);
+    void HandleExitInput(const FInputActionValue& Value);
 
     // Helper
     void ApplyInputMappingToController(AController* InController);
+    void RemoveShipInputMappingFromController(AController* InController);
+    void ExitToCachedPawn(AController* InController);
+
+    TWeakObjectPtr<APawn> LastDriverPawn;
 };

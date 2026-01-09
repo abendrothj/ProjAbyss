@@ -92,6 +92,12 @@ void AMasterShip::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
             EnhancedInputComponent->BindAction(TurnAction, ETriggerEvent::Triggered, this, &AMasterShip::TurnRight);
             EnhancedInputComponent->BindAction(TurnAction, ETriggerEvent::Completed, this, &AMasterShip::TurnRight);
         }
+
+        // Allow exiting the ship with the same Interact key
+        if (InteractAction)
+        {
+            EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMasterShip::HandleExitInput);
+        }
     }
 }
 
@@ -191,6 +197,21 @@ void AMasterShip::ApplyInputMappingToController(AController* InController)
     }
 }
 
+void AMasterShip::RemoveShipInputMappingFromController(AController* InController)
+{
+    if (!InController) return;
+    if (APlayerController* PlayerController = Cast<APlayerController>(InController))
+    {
+        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+        {
+            if (DefaultMappingContext)
+            {
+                Subsystem->RemoveMappingContext(DefaultMappingContext);
+            }
+        }
+    }
+}
+
 void AMasterShip::Interact_Implementation(APawn* InstigatorPawn)
 {
     if (!InstigatorPawn) return;
@@ -201,6 +222,9 @@ void AMasterShip::Interact_Implementation(APawn* InstigatorPawn)
     {
         return;
     }
+
+    // Cache the pawn so we can return later
+    LastDriverPawn = InstigatorPawn;
 
     // Unpossess the instigator pawn
     InstigatorController->UnPossess();
@@ -213,4 +237,40 @@ void AMasterShip::Interact_Implementation(APawn* InstigatorPawn)
 
     // Optional: disable input on the instigator pawn to avoid conflicts
     InstigatorPawn->DisableInput(Cast<APlayerController>(InstigatorController));
+}
+
+void AMasterShip::ExitToCachedPawn(AController* InController)
+{
+    if (!InController) return;
+    APawn* CachedPawn = LastDriverPawn.Get();
+    if (!CachedPawn) return;
+
+    InController->UnPossess();
+    InController->Possess(CachedPawn);
+
+    RemoveShipInputMappingFromController(InController);
+
+    if (APlayerController* PC = Cast<APlayerController>(InController))
+    {
+        if (CachedPawn->GetController() == InController)
+        {
+            PC->SetViewTarget(CachedPawn);
+        }
+    }
+
+    CachedPawn->EnableInput(Cast<APlayerController>(InController));
+    LastDriverPawn.Reset();
+}
+
+void AMasterShip::HandleExitInput(const FInputActionValue& Value)
+{
+    if (Value.Get<bool>() == false)
+    {
+        return; // only on press
+    }
+
+    if (AController* C = GetController())
+    {
+        ExitToCachedPawn(C);
+    }
 }
