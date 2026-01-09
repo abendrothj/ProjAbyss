@@ -1,14 +1,69 @@
-Binaries
-DerivedDataCache
-Intermediate
-Saved
-.vscode
-.vs
-*.VC.db
-*.opensdf
-*.opendb
-*.sdf
+# Unreal Engine project ignores
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/*/Resources/
+
+# User-specific Unreal and editor files
 *.sln
 *.suo
-*.xcodeproj
-*.xcworkspace
+*.user
+*.userprefs
+*.opensdf
+*.sdf
+*.VC.db
+.vscode/
+.vs/
+
+# macOS/Xcode
+.DS_Store
+*.xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.xcuserstate
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+
+# Xcode projects/workspaces (keep shared data)
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
+
+# Logs and crash dumps
+*.log
+*.dmp
+
+# Generated shaders/cache
+ShaderDebugInfo/
+Shaders/
+
+# Unreal Build Tool and temp
+Saved/SourceControl/
+Saved/UnrealBuildTool/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Misc
+*.tmp
+*.bak
+Thumbs.db
+ehthumbs.db
+
+# External actors/objects are generated - often safe to ignore
+Content/__ExternalActors__/
+Content/__ExternalObjects__/
+
+# Keep project and config files tracked
+!Config/**
+!Content/**
+!Source/**
+!ProjAbyss.uproject
+!README.md
