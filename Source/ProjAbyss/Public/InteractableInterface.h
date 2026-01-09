@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -14,12 +12,16 @@ class UInteractableInterface : public UInterface
 };
 
 /**
- * 
+ * The Interface Definition.
+ * Any actor that implements this (Ship, Loot, Door) must define what happens when "Interacted" with.
  */
 class PROJABYSS_API IInteractableInterface
 {
 	GENERATED_BODY()
 
-	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	// The function we call when we press E
+	// "Instigator" is the person pressing the button (You)
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interaction")
+	void Interact(APawn* InstigatorPawn);
 };

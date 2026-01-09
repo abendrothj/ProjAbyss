@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
-#include "OceanSolver.h" // We include our math struct here
+#include "OceanSolver.h"
+#include "InputActionValue.h" // Required for Enhanced Input
+#include "InteractableInterface.h"
 #include "MasterShip.generated.h"
 
 UCLASS()
-class PROJABYSS_API AMasterShip : public APawn
+class PROJABYSS_API AMasterShip : public APawn, public IInteractableInterface
 {
     GENERATED_BODY()
 
@@ -15,37 +17,74 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+    // When possessed by a controller, ensure input mapping is applied
+    virtual void PossessedBy(AController* NewController) override;
 
 public:
     virtual void Tick(float DeltaTime) override;
+    virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
     // -- COMPONENTS --
-
-    // The physical body of the ship (The Hull)
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ship")
     UStaticMeshComponent* HullMesh;
 
-    // The 4 invisible "Floaters" at the corners
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+    class USpringArmComponent* CameraBoom;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+    class UCameraComponent* FollowCamera;
+
+    // Pontoons
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Buoyancy")
-    USceneComponent* PontoonFL; // Front Left
+    USceneComponent* PontoonFL;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Buoyancy")
-    USceneComponent* PontoonFR; // Front Right
+    USceneComponent* PontoonFR;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Buoyancy")
-    USceneComponent* PontoonBL; // Back Left
+    USceneComponent* PontoonBL;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Buoyancy")
-    USceneComponent* PontoonBR; // Back Right
+    USceneComponent* PontoonBR;
+
+    // -- INPUT (New Enhanced Input) --
+    
+    // The "Keyboard Map"
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputMappingContext* DefaultMappingContext;
+
+    // The "W/S" Action
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* MoveAction;
+
+    // The "A/D" Action
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* TurnAction;
 
     // -- SETTINGS --
-
-    // How strong the water pushes up. Tweak this in Editor!
     UPROPERTY(EditAnywhere, Category = "Buoyancy")
-    float FloatForce = 800.0f;
+    float FloatForce = 40000.0f;
 
-    // Water damping (drag) to stop infinite bouncing
     UPROPERTY(EditAnywhere, Category = "Buoyancy")
-    float WaterDrag = 20.0f;
+    float WaterDrag = 2.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float EnginePower = 500000.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Movement")
+    float TurnSpeed = 200000.0f;
+
+    // -- INTERACTION --
+    // Override from Interactable Interface (BlueprintNativeEvent requires _Implementation)
+    virtual void Interact_Implementation(APawn* InstigatorPawn) override;
 
 private:
-    // Our C++ Math Calculator (From the struct we made earlier)
     FOceanSolver OceanSolver;
+    
+    float CurrentThrottle; 
+    float CurrentSteering;
+
+    // Updated Functions for Enhanced Input
+    void MoveForward(const FInputActionValue& Value);
+    void TurnRight(const FInputActionValue& Value);
+
+    // Helper
+    void ApplyInputMappingToController(AController* InController);
 };
