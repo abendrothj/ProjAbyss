@@ -156,6 +156,7 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 | `save_load.rs` | F5/F9 persistence |
 | `artifacts.rs` | Artifacts, inventory, inventory UI |
 | `audio.rs` | Pickup sound |
+| `fauna.rs` | Boids (schooling fish), flee from player/sub |
 | `settings.rs` | InputBindings, GameSettings |
 
 ---
@@ -182,7 +183,7 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 
 | Area | Phase | Notes |
 |------|-------|------|
-| Boids/Fauna | 2 | Schooling fish |
+| Boids/Fauna | 2 | Done – 5 schools, cohesion/separation/alignment, flee |
 | Shark | 2 | Patrol, chase |
 | Wind/Storms | 3 | Ship speed, visual |
 | Ship damage | 3 | Hull health, repair |

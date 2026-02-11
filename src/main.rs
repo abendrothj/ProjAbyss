@@ -8,6 +8,7 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 mod artifacts;
 mod audio;
+mod fauna;
 mod settings;
 mod game_state;
 mod interaction;
@@ -41,7 +42,6 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(GameStatePlugin)
         .add_plugins(settings::SettingsPlugin)
-        .add_plugins(save_load::SaveLoadPlugin)
         .add_plugins(artifacts::ArtifactsPlugin)
         .add_plugins(audio::AudioPlugin)
         .add_plugins(OceanPlugin)
@@ -52,6 +52,8 @@ fn main() {
         .add_plugins(CharacterPlugin)
         .add_plugins(scatter::ScatterPlugin)
         .add_plugins(marine_snow::MarineSnowPlugin)
+        .add_plugins(save_load::SaveLoadPlugin)
+        .add_plugins(fauna::FaunaPlugin)
         .run();
 }
 

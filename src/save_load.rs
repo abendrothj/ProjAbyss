@@ -17,6 +17,9 @@ use crate::winch::WinchState;
 
 const SAVE_PATH: &str = "save.ron";
 
+#[derive(Resource, Default)]
+struct LoadRequest(Option<SaveData>);
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct SaveData {
     pub ship: EntitySave,
@@ -139,60 +142,67 @@ fn save_system(
     }
 }
 
-fn load_system(
+fn load_request_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     bindings: Res<InputBindings>,
-    mut ship_query: Query<(&mut Transform, &mut Velocity), With<Ship>>,
-    mut sub_query: Query<(&mut Transform, &mut Velocity), With<Submersible>>,
-    mut character_query: Query<&mut Transform, With<MarineCharacter>>,
-    mut mode: ResMut<PlayerMode>,
-    mut winch: ResMut<WinchState>,
-    mut inventory: ResMut<Inventory>,
-    mut commands: Commands,
-    camera_query: Query<Entity, With<PlayerCamera>>,
-    character_entity_query: Query<Entity, With<MarineCharacter>>,
+    mut load_request: ResMut<LoadRequest>,
 ) {
     if !keyboard.just_pressed(bindings.load) {
         return;
     }
-
     let Ok(s) = std::fs::read_to_string(SAVE_PATH) else {
         bevy::log::warn!("No save file found at {}", SAVE_PATH);
         return;
     };
-
     let Ok(data) = ron::from_str::<SaveData>(&s) else {
         bevy::log::warn!("Failed to parse save file");
         return;
     };
+    load_request.0 = Some(data);
+}
 
-    if let Some((mut tf, mut vel)) = ship_query.iter_mut().next() {
+fn apply_load_system(world: &mut World) {
+    let Some(data) = world.remove_resource::<LoadRequest>().and_then(|r| r.0) else {
+        return;
+    };
+
+    let mut ship_query = world.query_filtered::<(&mut Transform, &mut Velocity), With<Ship>>();
+    if let Some((mut tf, mut vel)) = ship_query.iter_mut(world).next() {
         tf.translation = data.ship.to_translation();
         tf.rotation = data.ship.to_rotation();
         vel.linvel = Vec3::from_slice(&data.ship.velocity);
         vel.angvel = Vec3::from_slice(&data.ship.angvel);
     }
-    if let Some((mut tf, mut vel)) = sub_query.iter_mut().next() {
+    let mut sub_query = world.query_filtered::<(&mut Transform, &mut Velocity), With<Submersible>>();
+    if let Some((mut tf, mut vel)) = sub_query.iter_mut(world).next() {
         tf.translation = data.sub.to_translation();
         tf.rotation = data.sub.to_rotation();
         vel.linvel = Vec3::from_slice(&data.sub.velocity);
         vel.angvel = Vec3::from_slice(&data.sub.angvel);
     }
-    if let Some(mut tf) = character_query.iter_mut().next() {
+    let mut character_query = world.query_filtered::<&mut Transform, With<MarineCharacter>>();
+    if let Some(mut tf) = character_query.iter_mut(world).next() {
         tf.translation = data.character.to_translation();
         tf.rotation = data.character.to_rotation();
     }
 
-    mode.in_boat = data.player_mode.in_boat;
-    mode.in_submersible = data.player_mode.in_submersible;
-    winch.cable_length = data.winch_cable_length.clamp(5.0, 100.0);
-    inventory.items = data.inventory_items.clone();
+    if let Some(mut mode) = world.get_resource_mut::<PlayerMode>() {
+        mode.in_boat = data.player_mode.in_boat;
+        mode.in_submersible = data.player_mode.in_submersible;
+    }
+    if let Some(mut winch) = world.get_resource_mut::<WinchState>() {
+        winch.cable_length = data.winch_cable_length.clamp(5.0, 100.0);
+    }
+    if let Some(mut inventory) = world.get_resource_mut::<Inventory>() {
+        inventory.items = data.inventory_items.clone();
+    }
 
-    // Put camera on character (simplest: always load as on-foot for camera; positions are restored)
-    let Some(cam_id) = camera_query.iter().next() else { return };
-    let Some(char_id) = character_entity_query.iter().next() else { return };
-    commands.entity(cam_id).despawn();
-    let cam_id = commands.spawn((
+    let mut camera_query = world.query_filtered::<Entity, With<PlayerCamera>>();
+    let mut character_entity_query = world.query_filtered::<Entity, With<MarineCharacter>>();
+    let Some(cam_id) = camera_query.iter(world).next() else { return };
+    let Some(char_id) = character_entity_query.iter(world).next() else { return };
+    world.entity_mut(cam_id).despawn();
+    let cam_id = world.spawn((
         Camera3d::default(),
         bevy::render::view::Hdr,
         bevy::core_pipeline::tonemapping::Tonemapping::AgX,
@@ -207,10 +217,13 @@ fn load_system(
         PlayerCamera,
         Transform::from_xyz(0.0, 0.9, 0.0),
     )).id();
-    commands.entity(char_id).add_children(&[cam_id]);
-    mode.in_boat = false;
-    mode.in_submersible = false;
+    world.entity_mut(char_id).add_children(&[cam_id]);
+    if let Some(mut mode) = world.get_resource_mut::<PlayerMode>() {
+        mode.in_boat = false;
+        mode.in_submersible = false;
+    }
 
+    world.insert_resource(LoadRequest::default());
     bevy::log::info!("Loaded from {}", SAVE_PATH);
 }
 
@@ -218,9 +231,18 @@ pub struct SaveLoadPlugin;
 
 impl Plugin for SaveLoadPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (save_system, load_system).run_if(in_state(GameState::Playing)),
-        );
+        app.init_resource::<LoadRequest>()
+            .add_systems(
+                Update,
+                load_request_system.run_if(in_state(GameState::Playing)),
+            )
+            .add_systems(
+                Update,
+                save_system.run_if(in_state(GameState::Playing)),
+            )
+            .add_systems(
+                PostUpdate,
+                apply_load_system.run_if(in_state(GameState::Playing)),
+            );
     }
 }

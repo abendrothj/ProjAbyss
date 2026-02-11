@@ -38,6 +38,9 @@ pub struct WinchState {
 #[derive(Resource)]
 struct CableVisual(Entity);
 
+#[derive(Component)]
+struct CableMesh;
+
 pub struct WinchPlugin;
 
 impl Plugin for WinchPlugin {
@@ -115,6 +118,7 @@ fn spawn_cable_visual(
             Mesh3d(cable_mesh),
             MeshMaterial3d(cable_mat),
             Transform::default(),
+            CableMesh,
         ))
         .id();
     commands.insert_resource(CableVisual(id));
@@ -124,7 +128,7 @@ fn update_cable_visual(
     cable: Res<CableVisual>,
     ship_query: Query<&Transform, With<Ship>>,
     sub_query: Query<&Transform, With<Submersible>>,
-    mut transform_query: Query<&mut Transform>,
+    mut transform_query: Query<&mut Transform, (With<CableMesh>, Without<Submersible>, Without<Ship>)>,
 ) {
     let Ok(ship_tf) = ship_query.single() else { return };
     let Ok(sub_tf) = sub_query.single() else { return };
