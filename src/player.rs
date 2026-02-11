@@ -32,7 +32,12 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PlayerMode::default())
             .add_systems(Startup, cursor_lock)
-            .add_systems(Update, (toggle_boat_enter, cursor_toggle, update_depth_color_grading));
+            .add_systems(Update, (
+                toggle_boat_enter,
+                cursor_toggle,
+                update_depth_color_grading,
+                update_depth_fog,
+            ));
     }
 }
 
@@ -49,9 +54,32 @@ fn update_depth_color_grading(
 ) {
     for (mut grading, global) in camera_query.iter_mut() {
         let y = global.translation().y;
-        let depth_factor = if y < 0.0 { (-y).min(30.0) / 30.0 } else { 0.0 };
-        grading.global.temperature = -0.4 * depth_factor;
-        grading.global.post_saturation = 1.0 + 0.15 * depth_factor;
+        // Stronger depth absorption: red fades first, blue dominates (design bible: 10m–100m)
+        let depth_factor = if y < 0.0 {
+            ((-y).min(80.0) / 80.0).powf(0.7)
+        } else {
+            0.0
+        };
+        grading.global.temperature = -0.6 * depth_factor;
+        grading.global.post_saturation = 1.0 + 0.25 * depth_factor;
+    }
+}
+
+fn update_depth_fog(
+    mut camera_query: Query<(&mut bevy::pbr::DistanceFog, &GlobalTransform), With<PlayerCamera>>,
+) {
+    use bevy::pbr::FogFalloff;
+    for (mut fog, global) in camera_query.iter_mut() {
+        let y = global.translation().y;
+        if y < 0.0 {
+            let depth = (-y).min(80.0);
+            let density = 0.008 + 0.018 * (depth / 80.0);
+            fog.color = Color::srgba(0.2, 0.35, 0.6, 0.35);
+            fog.falloff = FogFalloff::Exponential { density };
+        } else {
+            fog.color = Color::srgba(0.5, 0.6, 0.8, 0.2);
+            fog.falloff = FogFalloff::Exponential { density: 0.008 };
+        }
     }
 }
 

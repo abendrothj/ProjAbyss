@@ -84,7 +84,9 @@
 5. ~~**Volumetric fog**~~ – DONE (DistanceFog on camera)
 6. ~~**Scatter system**~~ – DONE (rocks, seaweed, debris)
 7. ~~**Normal mapping on water**~~ – DONE (procedural 128×128 ripple normals, 24× tiling)
-8. **GLTF + textures** – Ship, bell, props when assets exist
+8. ~~**Marine snow**~~ – DONE (400 particles, underwater only, drift + recycle)
+9. ~~**GLTF + textures**~~ – Sub colormap applied; island/rock procedural textures
+10. ~~**Depth-based seafloor fade**~~ – Denser fog when underwater
 
 ---
 

@@ -1,7 +1,11 @@
 //! ProjAbyss - Co-op extraction survival. Sail -> Scan -> Dive -> Extract.
 
 use bevy::prelude::*;
+use bevy::asset::RenderAssetUsages;
+use bevy::image::ImageSamplerDescriptor;
+use bevy::image::{Image, ImageAddressMode, ImageFilterMode, ImageSampler};
 use bevy::light::DirectionalLightShadowMap;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 mod ocean;
 mod ship;
@@ -10,6 +14,7 @@ mod character;
 mod player;
 mod islands;
 mod scatter;
+mod marine_snow;
 
 use ocean::OceanPlugin;
 use ship::ShipPlugin;
@@ -30,13 +35,45 @@ fn main() {
         .add_plugins(DivingBellPlugin)
         .add_plugins(CharacterPlugin)
         .add_plugins(scatter::ScatterPlugin)
+        .add_plugins(marine_snow::MarineSnowPlugin)
         .run();
+}
+
+fn create_terrain_noise_texture(size: u32, base_r: f32, base_g: f32, base_b: f32, variation: f32) -> Image {
+    let size = size as usize;
+    let mut data = Vec::with_capacity(size * size * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let u = x as f32 / size as f32;
+            let v = y as f32 / size as f32;
+            let n = (u * 12.0 + 1.0).sin() * (v * 8.0 + 0.5).cos()
+                + (u * 20.0 + v * 15.0).sin() * 0.3;
+            let v = (n + 1.0) * 0.5 * variation;
+            let r = ((base_r + v) * 255.0).clamp(0.0, 255.0) as u8;
+            let g = ((base_g + v * 0.8) * 255.0).clamp(0.0, 255.0) as u8;
+            let b = ((base_b + v * 0.6) * 255.0).clamp(0.0, 255.0) as u8;
+            data.extend([r, g, b, 255]);
+        }
+    }
+    let mut image = Image::new(
+        Extent3d { width: size as u32, height: size as u32, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::default(),
+    );
+    let mut sampler_desc = ImageSamplerDescriptor::default();
+    sampler_desc.set_filter(ImageFilterMode::Linear);
+    sampler_desc.set_address_mode(ImageAddressMode::Repeat);
+    image.sampler = ImageSampler::Descriptor(sampler_desc);
+    image
 }
 
 fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     // Ambient light – warm sky fill
     commands.insert_resource(GlobalAmbientLight {
@@ -66,30 +103,36 @@ fn setup_scene(
         Transform::from_xyz(-15.0, 20.0, 15.0),
     ));
 
-    // Seafloor – dark sand / sediment (submerged, ~80m deep). Collisions + driveable.
+    // Seafloor – subdivided plane with FBM vertex displacement (submerged, ~80m deep).
+    let seafloor_mesh = islands::create_seafloor_mesh(&mut meshes, 1600.0, 32, 2.5, 7.3);
+    let seafloor_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.22, 0.28, 0.35),
+        perceptual_roughness: 0.95,
+        metallic: 0.0,
+        ..default()
+    });
     commands.spawn((
         ColliderShape::Box {
             half_extents: Vec3::new(800.0, 0.5, 800.0),
         },
-        Mesh3d(meshes.add(Cuboid::new(1600.0, 1.0, 1600.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.22, 0.28, 0.35),
-            perceptual_roughness: 0.95,
-            metallic: 0.0,
-            ..default()
-        })),
+        Mesh3d(seafloor_mesh),
+        MeshMaterial3d(seafloor_mat),
         Transform::from_xyz(0.0, -80.5, 0.0),
     ));
 
-    // Materials for islands
+    // Materials for islands – procedural noise textures for variation
+    let island_tex = images.add(create_terrain_noise_texture(64, 0.35, 0.45, 0.3, 0.12));
+    let rock_tex = images.add(create_terrain_noise_texture(64, 0.4, 0.38, 0.35, 0.1));
     let island_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.35, 0.45, 0.3),
+        base_color_texture: Some(island_tex),
+        base_color: Color::WHITE,
         perceptual_roughness: 0.85,
         metallic: 0.0,
         ..default()
     });
     let rock_material = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.4, 0.38, 0.35),
+        base_color_texture: Some(rock_tex),
+        base_color: Color::WHITE,
         perceptual_roughness: 0.9,
         metallic: 0.0,
         ..default()

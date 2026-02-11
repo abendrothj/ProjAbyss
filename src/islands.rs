@@ -128,6 +128,32 @@ fn fbm(p: Vec2, octaves: u32, seed: f32) -> f32 {
     v / sum_a
 }
 
+/// Creates a subdivided seafloor plane with FBM vertex displacement.
+pub fn create_seafloor_mesh(
+    meshes: &mut Assets<Mesh>,
+    size: f32,
+    subdivisions: u32,
+    displacement: f32,
+    seed: f32,
+) -> Handle<Mesh> {
+    let mut mesh: Mesh = Plane3d::default()
+        .mesh()
+        .size(size, size)
+        .subdivisions(subdivisions)
+        .build();
+    let scale = 1.0 / 80.0;
+    if let Some(VertexAttributeValues::Float32x3(positions)) =
+        mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION)
+    {
+        for pos in positions.iter_mut() {
+            let h = fbm(Vec2::new(pos[0] * scale, pos[2] * scale), 3, seed);
+            pos[1] = h * displacement;
+        }
+    }
+    mesh.compute_normals();
+    meshes.add(mesh)
+}
+
 /// Height ratio for Caribbean-style flat islands (fraction of radius).
 /// 0.05 = barely out of water, ~2–3m elevation.
 const ISLAND_HEIGHT_RATIO: f32 = 0.05;

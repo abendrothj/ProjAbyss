@@ -40,9 +40,9 @@ impl Plugin for DivingBellPlugin {
                 Update,
                 (
                     diving_bell_oxygen,
-                    submersible_movement,
                     submersible_input.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
                     submersible_mouse_look.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
+                    submersible_movement,
                     submersible_island_collision,
                 ),
             );
@@ -54,14 +54,26 @@ fn spawn_diving_bell(
     asset_server: Res<AssetServer>,
 ) {
     let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/submersible.glb"));
-    commands.spawn((
-        SceneRoot(scene),
-        Transform::from_xyz(0.0, -4.0, -25.0).with_scale(Vec3::splat(4.0)),
-        ColliderShape::Cylinder {
-            radius: 2.5,
-            half_height: 3.0,
+    let light_id = commands.spawn((
+        PointLight {
+            intensity: 8_000.0,
+            range: 40.0,
+            color: Color::srgba(1.0, 0.95, 0.85, 1.0),
+            shadows_enabled: false,
+            ..default()
         },
-        Submersible {
+        Transform::from_xyz(0.0, 0.0, 4.0),
+    )).id();
+
+    let sub_id = commands
+        .spawn((
+            SceneRoot(scene),
+            Transform::from_xyz(0.0, -4.0, -25.0).with_scale(Vec3::splat(4.0)),
+            ColliderShape::Cylinder {
+                radius: 2.5,
+                half_height: 3.0,
+            },
+            Submersible {
             drive_power: 15.0,
             turn_speed: 1.2,
             ascend_speed: 8.0,
@@ -75,7 +87,10 @@ fn spawn_diving_bell(
             current_oxygen: 100.0,
             oxygen_drain_rate: 2.0,
         },
-    ));
+    ))
+    .id();
+
+    commands.entity(sub_id).add_child(light_id);
 }
 
 fn diving_bell_oxygen(
@@ -93,14 +108,17 @@ fn submersible_movement(
     mut query: Query<(&Submersible, &mut SubmersibleVelocity, &mut Transform)>,
     time: Res<Time>,
 ) {
+    const WATER_DRAG: f32 = 0.95;    // decay when idle; sub holds depth/position (neutral buoyancy)
+
     for (sub, mut vel, mut transform) in query.iter_mut() {
         let forward = transform.forward();
         vel.0 += forward * sub.drive_power * sub.current_throttle * time.delta_secs();
         vel.0.y += sub.ascend_speed * sub.current_vertical * time.delta_secs();
-        transform.rotate_y(sub.turn_speed * sub.current_steering * time.delta_secs());
 
+        // Neutral buoyancy: no input = no sink/rise. Sub is trim-able and holds depth.
+        transform.rotate_y(sub.turn_speed * sub.current_steering * time.delta_secs());
         transform.translation += vel.0 * time.delta_secs();
-        vel.0 *= 0.97;
+        vel.0 *= WATER_DRAG;
     }
 }
 

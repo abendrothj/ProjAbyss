@@ -66,7 +66,7 @@ fn spawn_ship(
             half_extents: Vec3::new(2.5, 0.7, 4.0),
         },
         Ship {
-            float_force: 4000.0,
+            float_force: 350.0,
             water_drag: 2.0,
             engine_power: 22000.0,
             turn_speed: 3500.0,

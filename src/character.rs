@@ -112,7 +112,9 @@ fn character_movement(
         let underwater = pos.y < wave_height - 0.1;
 
         if underwater {
-            // Swimming: no gravity, Space ascend, Shift descend, WASD swim
+            // Swimming: slight sink when idle (not neutrally buoyant), Space ascend, Shift descend
+            const SINK_RATE: f32 = 1.8;
+            vel.0.y -= SINK_RATE * dt;
             vel.0.y *= 1.0 - SWIM_DRAG * dt;
 
             if keyboard.pressed(KeyCode::Space) {
@@ -204,15 +206,19 @@ fn character_island_collision(
                 margin,
             ) {
                 char_tf.translation += push;
-                char_tf.translation.y = char_pos.y;
 
                 let push_xz = push.xz();
                 if push_xz.length_squared() > 0.0001 {
                     let push_dir = push_xz.normalize();
-                    let into_island = vel.0.x * push_dir.x + vel.0.z * push_dir.y;
-                    if into_island < 0.0 {
-                        vel.0.x -= into_island * push_dir.x;
-                        vel.0.z -= into_island * push_dir.y;
+                    let into = vel.0.x * push_dir.x + vel.0.z * push_dir.y;
+                    if into < 0.0 {
+                        vel.0.x -= into * push_dir.x;
+                        vel.0.z -= into * push_dir.y;
+                    }
+                }
+                if push.y.abs() > 0.0001 {
+                    if vel.0.y * push.y < 0.0 {
+                        vel.0.y = 0.0;
                     }
                 }
             }
