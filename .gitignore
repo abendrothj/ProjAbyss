@@ -1,61 +1,37 @@
 # =============================================================================
-# Unreal Engine 5 - ProjAbyss
+# ProjAbyss - Bevy (Rust)
 # =============================================================================
 
-# Build outputs
+# Rust / Cargo
+target/
+**/target/
+*.rs.bk
+
+# Unreal Engine (leftover artifacts)
 Binaries/
 Build/
 DerivedDataCache/
 Intermediate/
 Saved/
 
-# Compiled assets
-*.VC.db
-*.opensdf
-*.sdf
-
 # =============================================================================
 # IDEs & Editors
 # =============================================================================
 
-# Visual Studio
 .vs/
-*.sln
-*.suo
-*.user
-*.userprefs
-*.vcxproj
-*.vcxproj.filters
-
-# Visual Studio Code / Cursor
 .vscode/
 *.code-workspace
-
-# JetBrains Rider / IntelliJ
 .idea/
 *.iml
+*.sublime-*
 
 # =============================================================================
 # Platform-specific
 # =============================================================================
 
-# macOS
 .DS_Store
-*.xcuserdata
-*.xcuserstate
-*.xcscmblueprint
 .AppleDouble
 .LSOverride
-
-# Xcode - ignore generated, keep shared
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-*.xcworkspace/*
-!*.xcworkspace/contents.xcworkspacedata
-!*.xcworkspace/xcshareddata/
-
-# Windows
 Thumbs.db
 ehthumbs.db
 Desktop.ini
@@ -67,43 +43,12 @@ Desktop.ini
 *.swo
 
 # =============================================================================
-# Unreal Engine generated / cache
-# =============================================================================
-
-# Shaders and debug
-ShaderDebugInfo/
-Shaders/
-
-# External actors/objects (per-level instance data, often regenerated)
-Content/__ExternalActors__/
-Content/__ExternalObjects__/
-
-# Cooked / packaged
-*.Target.cs.user
-
-# =============================================================================
 # Logs & crashes
 # =============================================================================
 
 *.log
 *.dmp
 *.crashlytics
-
-# =============================================================================
-# Python (if using editor scripts)
-# =============================================================================
-
-__pycache__/
-*.py[cod]
-*.pyo
-.Python
-*.egg-info/
-*.egg
-
-# =============================================================================
-# Project-specific
-# =============================================================================
-
 activity.log
 
 # =============================================================================
@@ -114,5 +59,4 @@ activity.log
 *.temp
 *.bak
 *.backup
-*.tmp
 .cache/

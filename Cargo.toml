@@ -1,0 +1,8 @@
+[package]
+name = "proj_abyss"
+version = "0.1.0"
+edition = "2021"
+description = "Co-op extraction survival. Sail -> Scan -> Dive -> Extract."
+
+[dependencies]
+bevy = "0.14"
