@@ -139,9 +139,10 @@ fn spawn_water(
     mut images: ResMut<Assets<Image>>,
 ) {
     // Use subdivided plane for wave deformation (64x64 for large map).
+    let map_size = crate::world::MAP_SIZE;
     let mut plane_mesh: Mesh = Plane3d::default()
         .mesh()
-        .size(1500.0, 1500.0)
+        .size(map_size, map_size)
         .subdivisions(64)
         .build();
     plane_mesh.asset_usage = RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD;
@@ -196,7 +197,8 @@ fn update_water_mesh(
 ) {
     let Some(mesh) = meshes.get_mut(&handle.0) else { return };
     let n = WAVE_GRID;
-    let cell_size = 1500.0 / 65.0; // 65 cells between 66 vertices (subdivisions=64)
+    let map_size = crate::world::MAP_SIZE;
+    let cell_size = map_size / 65.0; // 65 cells between 66 vertices (subdivisions=64)
     let water_tint = [0.2, 0.4, 0.6, 0.98];
     let foam_tint = [1.0, 1.0, 1.0, 1.0];
     let steepness_lo = 0.012;

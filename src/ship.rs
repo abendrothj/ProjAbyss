@@ -8,6 +8,10 @@ use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::*;
 use crate::ocean::OceanSolver;
 use crate::player::PlayerMode;
+use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
+
+/// Ship anchored near Safe Island: offset from island center.
+const SHIP_ANCHOR_OFFSET: Vec3 = Vec3::new(3.0, 0.0, -2.0);
 
 /// Hull corners for buoyancy (rowboat ≈ 2.5 scale).
 const PONTOON_OFFSETS: [Vec3; 4] = [
@@ -60,7 +64,11 @@ fn spawn_ship(
         },
         ExternalForce::default(),
         SceneRoot(scene),
-        Transform::from_xyz(0.0, -0.5, 0.0).with_scale(Vec3::splat(2.5)),
+        Transform::from_xyz(
+            SPAWN_ISLAND_X + SHIP_ANCHOR_OFFSET.x * MAP_SCALE_FROM_LEGACY,
+            -0.5,
+            SPAWN_ISLAND_Z + SHIP_ANCHOR_OFFSET.z * MAP_SCALE_FROM_LEGACY,
+        ).with_scale(Vec3::splat(2.5)),
         Ship {
             float_force: 22000.0,
             water_drag: 2.0,

@@ -1,6 +1,18 @@
 PROJECT ABYSS: GAME DESIGN DOCUMENT & TECHNICAL BIBLE
 
-**Bevy Implementation:** Bevy 0.17 + bevy_rapier3d. Ship (Dynamic + ExternalForce), sub (KinematicVelocityBased), character (KinematicCharacterController). Ocean (Gerstner waves, SEA_LEVEL -2). Islands (FBM blobs, compound shapes, scatter). See activity.log for changelog.
+**Bevy Implementation:** Bevy 0.17 + bevy_rapier3d. Big map: 5km × 5km (MAP_SIZE). Ship (Dynamic + ExternalForce), sub (KinematicVelocityBased), character (KinematicCharacterController). Ocean (Gerstner waves, SEA_LEVEL -2). Islands (FBM blobs, compound shapes, scatter). Winch (RopeJoint). See activity.log for changelog.
+
+---
+
+## Vision: Underwater Exploration First
+
+Project Abyss is an **underwater exploration game**. The ocean is the main space of play. Players sail, swim, and dive to discover reefs, wrecks, caves, and the abyss. The submersible is a tool for *excessively deep* exploration—not a requirement for enjoying the underwater world.
+
+- **Swim freely** in shallows (0–20m) and mid-depth (20–50m). No sub needed.
+- **Sub optional** in those zones for convenience (faster travel, oxygen).
+- **Sub required** only in deep (50–80m) and abyss (80m+) zones.
+
+See **docs/DESIGN.md** and **docs/EXPLORATION.md** for full design and implementation notes.
 
 ---
 

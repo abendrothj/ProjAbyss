@@ -9,6 +9,8 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 mod ocean;
 mod ship;
 mod diving_bell;
+mod winch;
+mod world;
 mod character;
 mod player;
 mod islands;
@@ -34,6 +36,7 @@ fn main() {
         .add_plugins(PlayerPlugin)
         .add_plugins(ShipPlugin)
         .add_plugins(DivingBellPlugin)
+        .add_plugins(winch::WinchPlugin)
         .add_plugins(CharacterPlugin)
         .add_plugins(scatter::ScatterPlugin)
         .add_plugins(marine_snow::MarineSnowPlugin)
@@ -102,7 +105,7 @@ fn setup_scene(
     ));
 
     // Seafloor – subdivided plane with FBM vertex displacement (submerged, ~80m deep).
-    let seafloor_mesh = islands::create_seafloor_mesh(&mut meshes, 1600.0, 32, 2.5, 7.3);
+    let seafloor_mesh = islands::create_seafloor_mesh(&mut meshes, world::MAP_SIZE, 64, 2.5, 7.3);
     let seafloor_mat = materials.add(StandardMaterial {
         base_color: Color::srgb(0.22, 0.28, 0.35),
         perceptual_roughness: 0.95,
@@ -111,10 +114,10 @@ fn setup_scene(
     });
     commands.spawn((
         RigidBody::Fixed,
-        Collider::cuboid(800.0, 0.5, 800.0),
+        Collider::cuboid(world::MAP_SIZE * 0.5, 0.5, world::MAP_SIZE * 0.5),
         Mesh3d(seafloor_mesh),
         MeshMaterial3d(seafloor_mat),
-        Transform::from_xyz(0.0, -80.5, 0.0),
+        Transform::from_xyz(0.0, world::MAP_FLOOR_Y - 0.5, 0.0),
     ));
 
     // Materials for islands – procedural noise textures for variation

@@ -8,6 +8,11 @@ use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy_rapier3d::prelude::*;
 use crate::ocean::OceanSolver;
 use crate::player::{PlayerCamera, PlayerMode};
+use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
+
+/// Deck offset from ship center (character stands on ship).
+const SHIP_DECK_OFFSET: Vec3 = Vec3::new(0.0, 0.5, 2.0);
+const SHIP_ANCHOR_OFFSET: Vec3 = Vec3::new(3.0, 0.0, -2.0);
 
 const SWIM_SPEED: f32 = 2.5;
 const SWIM_ASCEND_SPEED: f32 = 4.0;
@@ -62,7 +67,11 @@ fn spawn_character(
         },
         Mesh3d(meshes.add(Capsule3d::new(0.4, 0.9))),
         MeshMaterial3d(materials.add(Color::srgb_u8(200, 150, 100))),
-        Transform::from_xyz(0.0, 0.0, 2.0),
+        Transform::from_xyz(
+            SPAWN_ISLAND_X + SHIP_ANCHOR_OFFSET.x * MAP_SCALE_FROM_LEGACY + SHIP_DECK_OFFSET.x,
+            SHIP_DECK_OFFSET.y,
+            SPAWN_ISLAND_Z + SHIP_ANCHOR_OFFSET.z * MAP_SCALE_FROM_LEGACY + SHIP_DECK_OFFSET.z,
+        ), // On ship deck (ship is child of character? No - character is separate)
         MarineCharacter {
             walk_speed: 4.0,
             jump_velocity: 6.0,

@@ -9,6 +9,11 @@ use bevy::ui::{AlignItems, FlexDirection, JustifyContent};
 use bevy_rapier3d::prelude::*;
 use crate::ocean::OceanSolver;
 use crate::player::PlayerMode;
+use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
+
+const SHIP_ANCHOR_OFFSET: Vec3 = Vec3::new(3.0, 0.0, -2.0);
+/// Sub spawns in water near ship (stern).
+const SUB_OFFSET_FROM_SHIP: Vec3 = Vec3::new(0.0, -4.0, -25.0);
 
 #[derive(Component)]
 pub struct Submersible {
@@ -81,7 +86,11 @@ fn spawn_diving_bell(
             GravityScale(0.0),
             Velocity::default(),
             SceneRoot(scene),
-            Transform::from_xyz(0.0, -4.0, -25.0).with_scale(Vec3::splat(4.0)),
+            Transform::from_xyz(
+                SPAWN_ISLAND_X + SHIP_ANCHOR_OFFSET.x * MAP_SCALE_FROM_LEGACY + SUB_OFFSET_FROM_SHIP.x,
+                SUB_OFFSET_FROM_SHIP.y,
+                SPAWN_ISLAND_Z + SHIP_ANCHOR_OFFSET.z * MAP_SCALE_FROM_LEGACY + SUB_OFFSET_FROM_SHIP.z,
+            ).with_scale(Vec3::splat(4.0)),
             Submersible {
             drive_power: 15.0,
             turn_speed: 1.2,

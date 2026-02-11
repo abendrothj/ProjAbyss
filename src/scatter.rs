@@ -6,6 +6,7 @@ use bevy::scene::SceneRoot;
 
 use crate::islands::{IslandCollider, SafeIsland};
 use crate::ocean::SEA_LEVEL;
+use crate::world::MAP_FLOOR_Y;
 
 /// Scatter props around island bases and on seafloor.
 pub struct ScatterPlugin;
@@ -44,13 +45,14 @@ fn spawn_scatter(
     });
 
     // Rocks: irregular boulders (squashed spheres) + pebbles (scaled cuboids)
-    let rock_boulder_mesh = meshes.add(Sphere::new(0.5).mesh().uv(8, 6));
-    let rock_pebble_mesh = meshes.add(Cuboid::new(0.25, 0.15, 0.35).mesh().build());
-    // Seaweed: tapered capsule (thicker base, thinner tip)
-    let seaweed_mesh = meshes.add(Capsule3d::new(0.06, 0.7).mesh().build());
-    // Debris: varied crate/barrel shapes
-    let debris_crate_mesh = meshes.add(Cuboid::new(0.3, 0.25, 0.4).mesh().build());
-    let debris_barrel_mesh = meshes.add(Cylinder::new(0.15, 0.25).mesh().resolution(8));
+    // Boulders ~1–2m, pebbles ~0.3–0.5m for visibility at map scale
+    let rock_boulder_mesh = meshes.add(Sphere::new(0.8).mesh().uv(8, 6));
+    let rock_pebble_mesh = meshes.add(Cuboid::new(0.4, 0.25, 0.5).mesh().build());
+    // Seaweed: tapered capsule (thicker base, thinner tip) ~1–2m tall
+    let seaweed_mesh = meshes.add(Capsule3d::new(0.08, 1.2).mesh().build());
+    // Debris: varied crate/barrel shapes (~0.8–1m for visibility)
+    let debris_crate_mesh = meshes.add(Cuboid::new(0.5, 0.4, 0.6).mesh().build());
+    let debris_barrel_mesh = meshes.add(Cylinder::new(0.25, 0.5).mesh().resolution(8));
 
     for (transform, collider) in island_query.iter() {
         let center = transform.translation;
@@ -63,7 +65,7 @@ fn spawn_scatter(
             let dist = radius * 0.7 + (i as f32 * 0.3 % 0.4);
             let x = center.x + angle.cos() * dist;
             let z = center.z + angle.sin() * dist;
-            let scale = 0.4 + (i as f32 * 0.12 % 1.0);
+            let scale = 0.8 + (i as f32 * 0.15 % 1.2);
             let is_boulder = (i % 3) != 0;
             let mesh = if is_boulder {
                 rock_boulder_mesh.clone()
@@ -100,7 +102,7 @@ fn spawn_scatter(
                 let dist = radius * 0.6 + (i as f32 * 0.2 % 0.6);
                 let x = center.x + angle.cos() * dist;
                 let z = center.z + angle.sin() * dist;
-                let scale = 0.6 + (i as f32 * 0.15 % 0.6);
+                let scale = 0.8 + (i as f32 * 0.2 % 0.8);
                 commands.spawn((
                     Mesh3d(seaweed_mesh.clone()),
                     MeshMaterial3d(seaweed_mat.clone()),
@@ -112,38 +114,37 @@ fn spawn_scatter(
         }
     }
 
-    // Scatter buoys in open water
-    for i in 0..12 {
-        let angle = (i as f32 * 1.7) * std::f32::consts::TAU / 12.0;
-        let dist = 80.0 + (i as f32 * 11.0) % 60.0;
+    // Scatter buoys in open water across the map
+    for i in 0..24 {
+        let angle = (i as f32 * 1.7) * std::f32::consts::TAU / 24.0;
+        let dist = 400.0 + (i as f32 * 150.0) % 1800.0;
         let x = angle.cos() * dist;
         let z = angle.sin() * dist;
         commands.spawn((
             SceneRoot(buoy_scene.clone()),
             Transform::from_xyz(x, 0.5, z)
-                .with_scale(Vec3::splat(1.5))
+                .with_scale(Vec3::splat(2.0))
                 .with_rotation(Quat::from_rotation_y(angle)),
         ));
     }
 
-    // Scatter debris on seafloor – crates and barrels
-    const SEAFLOOR_Y: f32 = -80.0;
-    for gx in -3..=3 {
-        for gz in -3..=3 {
-            let x = gx as f32 * 35.0 + 12.0;
-            let z = gz as f32 * 35.0 - 8.0;
+    // Scatter debris on seafloor – crates and barrels across the map
+    for gx in -8..=8 {
+        for gz in -8..=8 {
+            let x = gx as f32 * 120.0 + 80.0;
+            let z = gz as f32 * 120.0 - 60.0;
             let hash = ((x * 7.0 + z * 13.0) as u32) % 100;
             if hash < 15 {
                 let is_crate = hash % 2 == 0;
                 let (mesh, scale_vec) = if is_crate {
-                    (debris_crate_mesh.clone(), Vec3::new(0.9, 0.7, 1.1))
+                    (debris_crate_mesh.clone(), Vec3::new(1.2, 1.0, 1.3))
                 } else {
-                    (debris_barrel_mesh.clone(), Vec3::new(1.0, 1.0, 1.0))
+                    (debris_barrel_mesh.clone(), Vec3::new(1.2, 1.0, 1.2))
                 };
                 commands.spawn((
                     Mesh3d(mesh),
                     MeshMaterial3d(debris_mat.clone()),
-                    Transform::from_xyz(x, SEAFLOOR_Y + 0.05, z)
+                    Transform::from_xyz(x, MAP_FLOOR_Y + 0.05, z)
                         .with_scale(scale_vec)
                         .with_rotation(Quat::from_rotation_y(x * 0.1)),
                 ));

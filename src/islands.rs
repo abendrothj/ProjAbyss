@@ -7,6 +7,8 @@ use bevy::mesh::VertexAttributeValues;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
+use crate::world::MAP_SCALE_FROM_LEGACY;
+
 /// Collision shape for islands. Used for ship and character collision.
 #[derive(Component)]
 pub struct IslandCollider {
@@ -197,7 +199,7 @@ pub fn spawn_all_islands(
         Collider::cylinder(2.0, 45.0),
         Mesh3d(organic_mesh),
         MeshMaterial3d(island_mat.clone()),
-        Transform::from_xyz(-120.0, 0.0, -200.0),
+        Transform::from_xyz(-120.0 * MAP_SCALE_FROM_LEGACY, 0.0, -200.0 * MAP_SCALE_FROM_LEGACY),
         IslandCollider { radius: 45.0 },
     ));
     commands.spawn((
@@ -205,7 +207,7 @@ pub fn spawn_all_islands(
         Collider::cylinder(0.35, 50.0),
         Mesh3d(meshes.add(Cylinder::new(50.0, 0.6))),
         MeshMaterial3d(sand_mat.clone()),
-        Transform::from_xyz(-120.0, 0.0, -200.0),
+        Transform::from_xyz(-120.0 * MAP_SCALE_FROM_LEGACY, 0.0, -200.0 * MAP_SCALE_FROM_LEGACY),
         IslandCollider { radius: 50.0 },
     ));
 
@@ -213,7 +215,7 @@ pub fn spawn_all_islands(
     spawn_compound(
         commands,
         meshes,
-        Vec3::new(180.0, 0.0, 150.0),
+        Vec3::new(180.0 * MAP_SCALE_FROM_LEGACY, 0.0, 150.0 * MAP_SCALE_FROM_LEGACY),
         42.0,
         &[
             (PartKind::Cone { radius: 1.0, height: 1.0 }, Vec3::ZERO, Vec3::new(25.0, 3.5, 25.0), false),
@@ -229,7 +231,7 @@ pub fn spawn_all_islands(
     spawn_compound(
         commands,
         meshes,
-        Vec3::new(80.0, 0.0, -300.0),
+        Vec3::new(80.0 * MAP_SCALE_FROM_LEGACY, 0.0, -300.0 * MAP_SCALE_FROM_LEGACY),
         38.0,
         &[
             (PartKind::Cuboid(Vec3::ONE), Vec3::new(0.0, 2.0, 0.0), Vec3::new(14.0, 3.0, 10.0), true),
@@ -244,7 +246,7 @@ pub fn spawn_all_islands(
     // Atoll (flat torus ring) + central islet
     let parent = commands
         .spawn((
-            Transform::from_translation(Vec3::new(-250.0, 0.0, 100.0)),
+            Transform::from_translation(Vec3::new(-250.0 * MAP_SCALE_FROM_LEGACY, 0.0, 100.0 * MAP_SCALE_FROM_LEGACY)),
             IslandCollider { radius: 38.0 },
         ))
         .id();
@@ -281,7 +283,7 @@ pub fn spawn_all_islands(
         Collider::cylinder(1.8, 35.0),
         Mesh3d(blob2),
         MeshMaterial3d(island_mat.clone()),
-        Transform::from_xyz(300.0, 0.0, -80.0),
+        Transform::from_xyz(300.0 * MAP_SCALE_FROM_LEGACY, 0.0, -80.0 * MAP_SCALE_FROM_LEGACY),
         IslandCollider { radius: 35.0 },
     ));
     commands.spawn((
@@ -289,7 +291,7 @@ pub fn spawn_all_islands(
         Collider::cylinder(0.3, 32.0),
         Mesh3d(meshes.add(Cylinder::new(32.0, 0.5))),
         MeshMaterial3d(sand_mat.clone()),
-        Transform::from_xyz(300.0, 0.0, -80.0),
+        Transform::from_xyz(300.0 * MAP_SCALE_FROM_LEGACY, 0.0, -80.0 * MAP_SCALE_FROM_LEGACY),
         IslandCollider { radius: 32.0 },
     ));
 
@@ -297,7 +299,7 @@ pub fn spawn_all_islands(
     spawn_compound(
         commands,
         meshes,
-        Vec3::new(-80.0, 0.0, 220.0),
+        Vec3::new(-80.0 * MAP_SCALE_FROM_LEGACY, 0.0, 220.0 * MAP_SCALE_FROM_LEGACY),
         28.0,
         &[
             (PartKind::Cuboid(Vec3::ONE), Vec3::new(0.0, 1.2, 0.0), Vec3::new(25.0, 2.0, 20.0), true),
@@ -313,7 +315,7 @@ pub fn spawn_all_islands(
     commands.spawn((
         Mesh3d(blob3),
         MeshMaterial3d(island_mat.clone()),
-        Transform::from_xyz(50.0, 0.0, 280.0),
+        Transform::from_xyz(50.0 * MAP_SCALE_FROM_LEGACY, 0.0, 280.0 * MAP_SCALE_FROM_LEGACY),
         RigidBody::Fixed,
         Collider::cylinder(1.4, 28.0),
         IslandCollider { radius: 28.0 },
@@ -323,7 +325,7 @@ pub fn spawn_all_islands(
     spawn_compound(
         commands,
         meshes,
-        Vec3::new(-350.0, 0.0, -150.0),
+        Vec3::new(-350.0 * MAP_SCALE_FROM_LEGACY, 0.0, -150.0 * MAP_SCALE_FROM_LEGACY),
         48.0,
         &[
             (PartKind::Cuboid(Vec3::ONE), Vec3::new(-25.0, 0.0, 0.0), Vec3::new(25.0, 1.5, 6.0), true),
@@ -338,7 +340,7 @@ pub fn spawn_all_islands(
     spawn_compound(
         commands,
         meshes,
-        Vec3::new(220.0, 0.0, 250.0),
+        Vec3::new(220.0 * MAP_SCALE_FROM_LEGACY, 0.0, 250.0 * MAP_SCALE_FROM_LEGACY),
         22.0,
         &[
             (PartKind::Cuboid(Vec3::ONE), Vec3::new(0.0, 1.2, 0.0), Vec3::new(12.0, 2.0, 10.0), true),
@@ -354,7 +356,7 @@ pub fn spawn_all_islands(
     commands.spawn((
         Mesh3d(blob_spawn),
         MeshMaterial3d(island_mat.clone()),
-        Transform::from_xyz(-15.0, 0.0, 10.0),
+        Transform::from_xyz(-15.0 * MAP_SCALE_FROM_LEGACY, 0.0, 10.0 * MAP_SCALE_FROM_LEGACY),
         RigidBody::Fixed,
         Collider::cylinder(0.8, 14.0),
         IslandCollider { radius: 14.0 },
@@ -363,7 +365,7 @@ pub fn spawn_all_islands(
     commands.spawn((
         Mesh3d(meshes.add(Cylinder::new(14.0, 0.4))),
         MeshMaterial3d(sand_mat.clone()),
-        Transform::from_xyz(-15.0, 0.0, 10.0),
+        Transform::from_xyz(-15.0 * MAP_SCALE_FROM_LEGACY, 0.0, 10.0 * MAP_SCALE_FROM_LEGACY),
         RigidBody::Fixed,
         Collider::cylinder(0.2, 14.0),
         IslandCollider { radius: 14.0 },
