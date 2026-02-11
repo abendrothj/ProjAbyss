@@ -5,4 +5,4 @@ edition = "2021"
 description = "Co-op extraction survival. Sail -> Scan -> Dive -> Extract."
 
 [dependencies]
-bevy = "0.14"
+bevy = "0.18"

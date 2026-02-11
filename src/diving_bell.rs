@@ -27,12 +27,9 @@ fn spawn_diving_bell(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Cylinder::new(1.5, 3.0)),
-            material: materials.add(Color::srgb_u8(80, 80, 90)),
-            transform: Transform::from_xyz(0.0, -5.0, 0.0),
-            ..default()
-        },
+        Mesh3d(meshes.add(Cylinder::new(1.5, 3.0))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(80, 80, 90))),
+        Transform::from_xyz(0.0, -5.0, 0.0),
         DivingBell {
             max_oxygen: 100.0,
             current_oxygen: 100.0,
@@ -48,7 +45,7 @@ fn diving_bell_oxygen(
 ) {
     for (transform, mut bell) in query.iter_mut() {
         if transform.translation.y < 0.0 {
-            bell.current_oxygen = (bell.current_oxygen - bell.oxygen_drain_rate * time.delta_seconds()).max(0.0);
+            bell.current_oxygen = (bell.current_oxygen - bell.oxygen_drain_rate * time.delta_secs()).max(0.0);
         }
     }
 }
