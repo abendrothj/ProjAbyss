@@ -4,9 +4,10 @@ use bevy::gltf::GltfAssetLabel;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
+use bevy::ui::{AlignItems, FlexDirection, JustifyContent};
 
 use bevy_rapier3d::prelude::*;
-use crate::ocean::SEA_LEVEL;
+use crate::ocean::OceanSolver;
 use crate::player::PlayerMode;
 
 #[derive(Component)]
@@ -22,6 +23,16 @@ pub struct Submersible {
 #[derive(Component)]
 pub struct SubmersibleVelocity(pub Vec3);
 
+/// Oxygen bar fill node – width updated by update_oxygen_ui.
+#[derive(Component)]
+struct OxygenBarFill;
+
+#[derive(Resource)]
+struct OxygenUiRoot {
+    root: Entity,
+    fill: Entity,
+}
+
 #[derive(Component)]
 pub struct DivingBell {
     pub max_oxygen: f32,
@@ -33,14 +44,15 @@ pub struct DivingBellPlugin;
 
 impl Plugin for DivingBellPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_diving_bell)
+        app.add_systems(Startup, (spawn_diving_bell, spawn_oxygen_ui))
             .add_systems(
                 Update,
                 (
                     diving_bell_oxygen,
                     submersible_input.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
-                    submersible_mouse_look.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
                     submersible_movement,
+                    submersible_mouse_look.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
+                    update_oxygen_ui,
                 ),
             );
     }
@@ -90,12 +102,68 @@ fn spawn_diving_bell(
     commands.entity(sub_id).add_child(light_id);
 }
 
+fn spawn_oxygen_ui(mut commands: Commands) {
+    let fill_id = commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.2, 0.6, 0.95, 0.9)),
+            OxygenBarFill,
+        ))
+        .id();
+    let root_id = commands
+        .spawn((
+            Node {
+                width: Val::Px(200.0),
+                height: Val::Px(24.0),
+                position_type: bevy::ui::PositionType::Absolute,
+                left: Val::Px(20.0),
+                bottom: Val::Px(20.0),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.1, 0.15, 0.25, 0.9)),
+            Visibility::Hidden,
+        ))
+        .add_child(fill_id)
+        .id();
+    commands.insert_resource(OxygenUiRoot { root: root_id, fill: fill_id });
+}
+
+fn update_oxygen_ui(
+    mode: Res<PlayerMode>,
+    oxygen_ui: Res<OxygenUiRoot>,
+    bell_query: Query<&DivingBell>,
+    mut visibility_query: Query<&mut Visibility>,
+    mut fill_query: Query<&mut Node, With<OxygenBarFill>>,
+) {
+    let mut root_vis = visibility_query.get_mut(oxygen_ui.root).unwrap();
+    if !mode.in_submersible {
+        *root_vis = Visibility::Hidden;
+        return;
+    }
+    *root_vis = Visibility::Visible;
+    let Ok(bell) = bell_query.single() else { return };
+    let pct = (bell.current_oxygen / bell.max_oxygen).max(0.0).min(1.0);
+    if let Ok(mut fill_node) = fill_query.get_mut(oxygen_ui.fill) {
+        fill_node.width = Val::Percent(pct * 100.0);
+    }
+}
+
 fn diving_bell_oxygen(
+    ocean: Res<OceanSolver>,
     mut query: Query<(&Transform, &mut DivingBell)>,
     time: Res<Time>,
 ) {
     for (transform, mut bell) in query.iter_mut() {
-        if transform.translation.y < SEA_LEVEL {
+        let wave_height = ocean.wave_height_at(transform.translation);
+        if transform.translation.y < wave_height {
             bell.current_oxygen = (bell.current_oxygen - bell.oxygen_drain_rate * time.delta_secs()).max(0.0);
         }
     }
@@ -149,17 +217,21 @@ fn submersible_input(
     }
 }
 
+/// Mouse look via angular velocity (matches ship; avoids Rapier overwriting Transform).
 fn submersible_mouse_look(
     mouse_motion: Res<AccumulatedMouseMotion>,
-    mut query: Query<&mut Transform, With<Submersible>>,
+    time: Res<Time>,
+    mut query: Query<&mut Velocity, With<Submersible>>,
 ) {
     let delta_x = mouse_motion.delta.x;
     if delta_x == 0.0 {
         return;
     }
     const SENSITIVITY: f32 = 0.002;
-    for mut transform in query.iter_mut() {
-        transform.rotate_y(-delta_x * SENSITIVITY);
+    let dt = time.delta_secs().max(0.001);
+    let ang = -delta_x * SENSITIVITY / dt;
+    for mut rb_vel in query.iter_mut() {
+        rb_vel.angvel.y += ang;
     }
 }
 

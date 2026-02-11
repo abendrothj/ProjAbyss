@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 
 use crate::islands::{IslandCollider, SafeIsland};
+use crate::ocean::SEA_LEVEL;
 
 /// Scatter props around island bases and on seafloor.
 pub struct ScatterPlugin;
@@ -74,10 +75,12 @@ fn spawn_scatter(
             } else {
                 Vec3::splat(scale)
             };
+            // Rocks at shore (island-relative): just above waterline
+            let rock_y = center.y + SEA_LEVEL + 1.5;
             commands.spawn((
                 Mesh3d(mesh),
                 MeshMaterial3d(rock_mat.clone()),
-                Transform::from_xyz(x, 0.2, z)
+                Transform::from_xyz(x, rock_y, z)
                     .with_scale(scale_vec)
                     .with_rotation(Quat::from_euler(
                         EulerRot::ZXY,
@@ -88,9 +91,10 @@ fn spawn_scatter(
             ));
         }
 
-        // Scatter seaweed (tapered capsules) in shallow water
+        // Scatter seaweed (tapered capsules) in shallow water (~0.5m below surface)
         if radius > 15.0 {
             let seaweed_count = (radius * 0.3) as usize;
+            let seaweed_y = center.y + SEA_LEVEL + 0.5;
             for i in 0..seaweed_count {
                 let angle = (i as f32 * 3.7) % std::f32::consts::TAU;
                 let dist = radius * 0.6 + (i as f32 * 0.2 % 0.6);
@@ -100,7 +104,7 @@ fn spawn_scatter(
                 commands.spawn((
                     Mesh3d(seaweed_mesh.clone()),
                     MeshMaterial3d(seaweed_mat.clone()),
-                    Transform::from_xyz(x, 0.1, z)
+                    Transform::from_xyz(x, seaweed_y, z)
                         .with_scale(Vec3::new(scale, scale * 1.4, scale))
                         .with_rotation(Quat::from_rotation_z((i as f32 * 0.5) % 0.4)),
                 ));
