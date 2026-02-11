@@ -6,6 +6,8 @@
 use bevy::prelude::*;
 
 use bevy_rapier3d::prelude::*;
+use crate::artifacts::{Artifact, AttachedArtifact, Inventory};
+use crate::audio::ArtifactPickupEvent;
 use crate::diving_bell::Submersible;
 use crate::game_state::GameState;
 use crate::settings::InputBindings;
@@ -52,6 +54,7 @@ impl Plugin for WinchPlugin {
                     .run_if(|mode: Res<PlayerMode>| mode.in_boat),
                 update_winch_joint_length.run_if(in_state(GameState::Playing)),
                 update_cable_visual.run_if(in_state(GameState::Playing)),
+                deliver_attached_artifact.run_if(in_state(GameState::Playing)),
             ),
         );
     }
@@ -136,6 +139,26 @@ fn update_cable_visual(
     cable_tf.translation = (from + to) * 0.5;
     cable_tf.scale = Vec3::new(1.0, len * 0.5, 1.0);
     cable_tf.rotation = Quat::from_rotation_arc(Vec3::Y, delta.normalize());
+}
+
+/// When cable is reeled to min length with an artifact attached, deliver to inventory.
+fn deliver_attached_artifact(
+    winch: Res<WinchState>,
+    mut attached: ResMut<AttachedArtifact>,
+    mut inventory: ResMut<Inventory>,
+    mut pickup_events: MessageWriter<ArtifactPickupEvent>,
+    artifact_query: Query<&Artifact>,
+    mut commands: Commands,
+) {
+    if winch.cable_length > MIN_CABLE_LENGTH + 0.5 {
+        return;
+    }
+    let Some(art_id) = attached.0 else { return };
+    let Ok(artifact) = artifact_query.get(art_id) else { return };
+    inventory.items.push(artifact.item_id.clone());
+    pickup_events.write(ArtifactPickupEvent);
+    commands.entity(art_id).despawn();
+    attached.0 = None;
 }
 
 /// Update the RopeJoint's max length when WinchState changes.

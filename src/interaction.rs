@@ -28,6 +28,7 @@ pub enum InteractKind {
     EnterShip,
     EnterSubmersible,
     Pickup { item_id: String },
+    AttachToWinch { item_id: String },
 }
 
 impl InteractKind {
@@ -36,6 +37,7 @@ impl InteractKind {
             InteractKind::EnterShip => "Press E to enter ship".into(),
             InteractKind::EnterSubmersible => "Press E to enter submersible".into(),
             InteractKind::Pickup { item_id } => format!("Press E to pick up {}", item_id),
+            InteractKind::AttachToWinch { item_id } => format!("Press E to attach {} to winch", item_id),
         }
     }
 }

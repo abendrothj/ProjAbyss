@@ -8,14 +8,16 @@ use bevy::post_process::bloom::Bloom;
 use bevy::render::view::{ColorGrading, Hdr};
 use bevy::text::TextLayout;
 
-use crate::artifacts::Inventory;
+use crate::artifacts::{Artifact, AttachedArtifact, Inventory};
 use crate::audio::ArtifactPickupEvent;
 use crate::character::MarineCharacter;
 use crate::game_state::GameState;
 use crate::interaction::{
     nearest_interactable_in_range, nearest_interactable_out_of_range, Interactable, InteractKind,
 };
+use crate::diving_bell::Submersible;
 use crate::ocean::SEA_LEVEL;
+use crate::ship::Ship;
 use crate::settings::InputBindings;
 
 /// Distance (m) at which E can enter ship or sub.
@@ -141,8 +143,11 @@ fn spawn_interact_prompt(mut commands: Commands, asset_server: Res<AssetServer>)
 
 fn update_interact_prompt(
     mode: Res<PlayerMode>,
+    attached: Res<AttachedArtifact>,
     prompt: Res<InteractPromptRoot>,
     character_query: Query<&Transform, With<MarineCharacter>>,
+    ship_query: Query<&Transform, With<Ship>>,
+    sub_query: Query<&Transform, With<Submersible>>,
     interactable_query: Query<(Entity, &Transform, &Interactable)>,
     mut visibility_query: Query<&mut Visibility>,
     mut text_query: Query<&mut Text>,
@@ -153,8 +158,45 @@ fn update_interact_prompt(
     let children = children_query.get(root).ok();
     let text_entity = children.and_then(|c| c.first().copied()).unwrap_or(root);
 
-    // In vehicle: show "Press E to exit"
+    // Player position for interaction: character (on foot), ship (in boat), sub (in sub)
+    let player_pos = if mode.in_submersible {
+        sub_query.single().ok().map(|t| t.translation)
+    } else if mode.in_boat {
+        ship_query.single().ok().map(|t| t.translation)
+    } else {
+        character_query.single().ok().map(|t| t.translation)
+    };
+
+    let Some(pos) = player_pos else {
+        *vis = Visibility::Hidden;
+        return;
+    };
+
+    // In sub with artifact attached: show detach
+    if mode.in_submersible && attached.0.is_some() {
+        *vis = Visibility::Visible;
+        if let Ok(mut text) = text_query.get_mut(text_entity) {
+            *text = Text::new("Press E to detach from winch");
+        }
+        return;
+    }
+
+    // In vehicle (boat or sub with no attach): show exit
     if mode.in_vehicle() {
+        // In sub: also check for nearby AttachToWinch
+        if mode.in_submersible {
+            if let Some((_, kind, _)) =
+                nearest_interactable_in_range(pos, interactable_query.iter())
+            {
+                if matches!(kind, InteractKind::AttachToWinch { .. }) {
+                    *vis = Visibility::Visible;
+                    if let Ok(mut text) = text_query.get_mut(text_entity) {
+                        *text = Text::new(kind.prompt());
+                    }
+                    return;
+                }
+            }
+        }
         *vis = Visibility::Visible;
         if let Ok(mut text) = text_query.get_mut(text_entity) {
             *text = Text::new("Press E to exit vehicle");
@@ -163,21 +205,15 @@ fn update_interact_prompt(
     }
 
     // On foot: use generic Interactable system
-    let Ok(char_tf) = character_query.single() else {
-        *vis = Visibility::Hidden;
-        return;
-    };
-    let char_pos = char_tf.translation;
-
     if let Some((_, kind, _)) =
-        nearest_interactable_in_range(char_pos, interactable_query.iter())
+        nearest_interactable_in_range(pos, interactable_query.iter())
     {
         *vis = Visibility::Visible;
         if let Ok(mut text) = text_query.get_mut(text_entity) {
             *text = Text::new(kind.prompt());
         }
     } else if let Some(_) = nearest_interactable_out_of_range(
-        char_pos,
+        pos,
         VEHICLE_ENTER_RANGE,
         15.0,
         interactable_query.iter(),
@@ -194,16 +230,23 @@ fn update_interact_prompt(
     }
 }
 
+/// Local offset of attached artifact below sub (hanging from winch).
+const ATTACHED_ARTIFACT_OFFSET: Vec3 = Vec3::new(0.0, -4.0, 0.0);
+
 fn toggle_boat_enter(
     keyboard: Res<ButtonInput<KeyCode>>,
     bindings: Res<InputBindings>,
     mut mode: ResMut<PlayerMode>,
+    mut attached: ResMut<AttachedArtifact>,
     mut inventory: ResMut<Inventory>,
     mut pickup_events: MessageWriter<ArtifactPickupEvent>,
     mut commands: Commands,
     camera_query: Query<Entity, With<PlayerCamera>>,
     character_query: Query<(Entity, &Transform), With<MarineCharacter>>,
+    sub_query: Query<(Entity, &Transform), With<Submersible>>,
     interactable_query: Query<(Entity, &Transform, &Interactable)>,
+    artifact_query: Query<&Artifact>,
+    global_transform_query: Query<&GlobalTransform>,
 ) {
     if !keyboard.just_pressed(bindings.interact) {
         return;
@@ -212,6 +255,51 @@ fn toggle_boat_enter(
     let Some(cam_id) = camera_query.iter().next() else { return };
     let Some((char_id, char_tf)) = character_query.iter().next() else { return };
     let char_pos = char_tf.translation;
+
+    // In sub: handle detach or attach before exit
+    if mode.in_submersible {
+        if let Some(art_id) = attached.0 {
+            // Detach: drop artifact at current position, restore physics and Interactable
+            if let Ok(global) = global_transform_query.get(art_id) {
+                let item_id = artifact_query
+                    .get(art_id)
+                    .map(|a| a.item_id.clone())
+                    .unwrap_or_else(|_| "Heavy Artifact".into());
+                commands.entity(art_id).remove_parent_in_place();
+                commands.entity(art_id).insert((
+                    Transform::from_translation(global.translation())
+                        .with_rotation(global.rotation()),
+                    bevy_rapier3d::prelude::RigidBody::Dynamic,
+                    bevy_rapier3d::prelude::Collider::cuboid(0.5, 0.5, 0.6),
+                    Interactable {
+                        kind: InteractKind::AttachToWinch {
+                            item_id: item_id.clone(),
+                        },
+                        range: VEHICLE_ENTER_RANGE,
+                    },
+                ));
+            }
+            attached.0 = None;
+            return;
+        }
+        // Check for nearby AttachToWinch
+        if let Ok((sub_id, sub_tf)) = sub_query.single() {
+            let sub_pos = sub_tf.translation;
+            if let Some((target_id, kind, _)) =
+                nearest_interactable_in_range(sub_pos, interactable_query.iter())
+            {
+                if let InteractKind::AttachToWinch { .. } = kind {
+                    commands.entity(target_id).remove::<bevy_rapier3d::prelude::RigidBody>();
+                    commands.entity(target_id).remove::<bevy_rapier3d::prelude::Collider>();
+                    commands.entity(target_id).remove::<Interactable>();
+                    commands.entity(target_id).insert(Transform::from_translation(ATTACHED_ARTIFACT_OFFSET));
+                    commands.entity(sub_id).add_child(target_id);
+                    attached.0 = Some(target_id);
+                    return;
+                }
+            }
+        }
+    }
 
     // Exit vehicle -> character
     if mode.in_vehicle() {

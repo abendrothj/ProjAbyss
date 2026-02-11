@@ -18,6 +18,10 @@ pub struct Inventory {
     pub items: Vec<String>,
 }
 
+/// Heavy artifact currently attached to winch (child of sub). Cleared on detach or deliver.
+#[derive(Resource, Default)]
+pub struct AttachedArtifact(pub Option<Entity>);
+
 #[derive(Component)]
 struct InventoryUiRoot;
 
@@ -29,6 +33,7 @@ pub struct ArtifactsPlugin;
 impl Plugin for ArtifactsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Inventory::default())
+            .insert_resource(AttachedArtifact::default())
             .add_systems(Startup, (spawn_artifacts, spawn_inventory_ui))
             .add_systems(Update, update_inventory_ui.run_if(in_state(GameState::Playing)));
     }
@@ -66,6 +71,37 @@ fn spawn_artifacts(
             },
             Interactable {
                 kind: InteractKind::Pickup {
+                    item_id: item_id.clone(),
+                },
+                range: VEHICLE_ENTER_RANGE,
+            },
+        ));
+    }
+
+    // Heavy artifacts – attach to winch from submersible, reel in to deliver
+    let heavy_positions = [
+        Vec3::new(0.0 * MAP_SCALE_FROM_LEGACY, -40.0, 100.0 * MAP_SCALE_FROM_LEGACY),
+        Vec3::new(-80.0 * MAP_SCALE_FROM_LEGACY, -55.0, -60.0 * MAP_SCALE_FROM_LEGACY),
+    ];
+    let heavy_mat = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.6, 0.35, 0.1),
+        metallic: 0.7,
+        perceptual_roughness: 0.5,
+        ..default()
+    });
+    for (i, pos) in heavy_positions.iter().enumerate() {
+        let item_id = format!("Heavy Artifact {}", i + 1);
+        commands.spawn((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.2))),
+            MeshMaterial3d(heavy_mat.clone()),
+            Transform::from_translation(*pos),
+            RigidBody::Fixed,
+            Collider::cuboid(0.5, 0.5, 0.6),
+            Artifact {
+                item_id: item_id.clone(),
+            },
+            Interactable {
+                kind: InteractKind::AttachToWinch {
                     item_id: item_id.clone(),
                 },
                 range: VEHICLE_ENTER_RANGE,

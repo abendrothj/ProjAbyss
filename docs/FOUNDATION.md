@@ -54,7 +54,7 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 | Component | Purpose |
 |-----------|---------|
 | `Interactable` | Marks entity as interactable. `kind`, `range`. |
-| `InteractKind` | EnterShip, EnterSubmersible, Pickup { item_id } |
+| `InteractKind` | EnterShip, EnterSubmersible, Pickup { item_id }, AttachToWinch { item_id } |
 
 **Helpers:**
 - `nearest_interactable_in_range(pos, query)` → `Option<(Entity, &InteractKind, dist_sq)>`
@@ -71,9 +71,11 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 
 | Context | Prompt |
 |---------|--------|
-| In vehicle | "Press E to exit vehicle" |
-| In range (≤6 m) | "Press E to enter ship" / "Press E to enter submersible" (nearest) |
-| 6–15 m | "Move closer to enter (6m)" |
+| In sub, artifact attached | "Press E to detach from winch" |
+| In sub, near heavy artifact | "Press E to attach X to winch" |
+| In vehicle (boat or sub, no attach) | "Press E to exit vehicle" |
+| On foot, in range (≤6 m) | "Press E to enter ship" / "Press E to enter submersible" / "Press E to pick up X" (nearest) |
+| On foot, 6–15 m | "Move closer to enter (6m)" |
 | > 15 m | Hidden |
 
 **Module:** `player.rs`  
@@ -105,13 +107,17 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 
 | Feature | Implementation |
 |---------|----------------|
-| Artifacts | 3 cuboids on seafloor (positions in artifacts.rs) |
-| Pickup | E in range → add to Inventory, despawn artifact |
-| Inventory | `Resource` with `Vec<String>`. No UI yet. |
+| Light artifacts | 3 cuboids on seafloor. `InteractKind::Pickup`. E in range → add to Inventory, despawn. |
+| Heavy artifacts | 2 cuboids (1×1×1.2) at depth. `InteractKind::AttachToWinch`. E in sub → attach to winch. Reel in (R) to deliver. |
+| Attach | In sub, near heavy artifact, E attaches as child of sub (hangs 4 m below). Follows sub. |
+| Detach | In sub with artifact attached, E drops at current position. Restores physics and Interactable. |
+| Delivery | Cable at min length (5 m) with artifact attached → add to inventory, despawn, `ArtifactPickupEvent`. |
+| Inventory | `Resource` with `Vec<String>`. Inventory UI when items exist. |
 
 **Module:** `artifacts.rs`  
 **Plugin:** `ArtifactsPlugin`  
-**Components:** `Artifact`, `Interactable` (Pickup kind)
+**Components:** `Artifact`, `Interactable` (Pickup or AttachToWinch)  
+**Resources:** `Inventory`, `AttachedArtifact` (Option&lt;Entity&gt;)
 
 **Note:** Save/load does not persist inventory. Future: add to SaveData.
 
@@ -140,7 +146,7 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 | `ocean.rs` | Gerstner waves, water mesh, OceanSolver |
 | `ship.rs` | Dynamic ship, buoyancy, engine |
 | `diving_bell.rs` | Submersible, oxygen, headlight |
-| `winch.rs` | RopeJoint, cable visual, R/T |
+| `winch.rs` | RopeJoint, cable visual, R/T reel in/out, deliver_attached_artifact when cable at min |
 | `world.rs` | MAP_SIZE, MAP_FLOOR_Y, spawn position |
 | `character.rs` | First-person, swim, oxygen, respawn |
 | `player.rs` | Mode switch, camera, prompts, depth color/fog |
@@ -162,7 +168,7 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 |------|--------|------|
 | **Inventory UI** | Done | Bottom-right panel when items; lists count + names |
 | **Save inventory** | Done | SaveData.inventory_items; restored on load |
-| **Heavy artifacts** | Partial | Current: pickup + despawn. Design: attach to winch, reel up |
+| **Heavy artifacts** | Done | Attach from sub, reel in (R) to deliver. Detach (E) to drop. |
 
 ### Medium Priority (Polish)
 
