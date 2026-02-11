@@ -5,6 +5,9 @@
 #include "OceanSolver.h"
 #include "InputActionValue.h" // Required for Enhanced Input
 #include "InteractableInterface.h"
+#include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "CableComponent.h"
+#include "DivingBell.h"
 #include "MasterShip.generated.h"
 
 UCLASS()
@@ -62,6 +65,26 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
     class UInputAction* InteractAction;
 
+    // The "Winch" Action (Axis1D: Scroll wheel Up = +1, Down = -1)
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
+    class UInputAction* ReelAction;
+
+    // -- WINCH --
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Winch")
+    UPhysicsConstraintComponent* WinchConstraint;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Winch")
+    UCableComponent* WinchCable;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Winch")
+    TSubclassOf<ADivingBell> DivingBellClass;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Winch")
+    float CurrentCableLength = 500.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Winch", meta = (ClampMin = "10.0", ClampMax = "20.0"))
+    float ReelSpeed = 10.0f;
+
     // -- SETTINGS --
     UPROPERTY(EditAnywhere, Category = "Buoyancy")
     float FloatForce = 40000.0f;
@@ -85,10 +108,15 @@ private:
     float CurrentThrottle; 
     float CurrentSteering;
 
+    UPROPERTY()
+    ADivingBell* SpawnedDivingBell;
+
     // Updated Functions for Enhanced Input
     void MoveForward(const FInputActionValue& Value);
     void TurnRight(const FInputActionValue& Value);
     void HandleExitInput(const FInputActionValue& Value);
+    void ReelIn(const FInputActionValue& Value);
+    void ReelOut(const FInputActionValue& Value);
 
     // Helper
     void ApplyInputMappingToController(AController* InController);

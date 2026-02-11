@@ -1,33 +1,53 @@
-# Unreal Engine project ignores
+# =============================================================================
+# Unreal Engine 5 - ProjAbyss
+# =============================================================================
+
+# Build outputs
 Binaries/
+Build/
 DerivedDataCache/
 Intermediate/
 Saved/
-Build/*/Resources/
 
-# User-specific Unreal and editor files
+# Compiled assets
+*.VC.db
+*.opensdf
+*.sdf
+
+# =============================================================================
+# IDEs & Editors
+# =============================================================================
+
+# Visual Studio
+.vs/
 *.sln
 *.suo
 *.user
 *.userprefs
-*.opensdf
-*.sdf
-*.VC.db
+*.vcxproj
+*.vcxproj.filters
+
+# Visual Studio Code / Cursor
 .vscode/
-.vs/
+*.code-workspace
 
-# macOS/Xcode
+# JetBrains Rider / IntelliJ
+.idea/
+*.iml
+
+# =============================================================================
+# Platform-specific
+# =============================================================================
+
+# macOS
 .DS_Store
-*.xcuserdata/
-*.xccheckout
-*.xcscmblueprint
+*.xcuserdata
 *.xcuserstate
-*.pbxuser
-*.mode1v3
-*.mode2v3
-*.perspectivev3
+*.xcscmblueprint
+.AppleDouble
+.LSOverride
 
-# Xcode projects/workspaces (keep shared data)
+# Xcode - ignore generated, keep shared
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
@@ -35,35 +55,58 @@ Build/*/Resources/
 !*.xcworkspace/contents.xcworkspacedata
 !*.xcworkspace/xcshareddata/
 
-# Logs and crash dumps
-*.log
-*.dmp
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.stackdump
 
-# Generated shaders/cache
+# Linux
+*~
+*.swp
+*.swo
+
+# =============================================================================
+# Unreal Engine generated / cache
+# =============================================================================
+
+# Shaders and debug
 ShaderDebugInfo/
 Shaders/
 
-# Unreal Build Tool and temp
-Saved/SourceControl/
-Saved/UnrealBuildTool/
-
-# Python cache
-__pycache__/
-*.pyc
-
-# Misc
-*.tmp
-*.bak
-Thumbs.db
-ehthumbs.db
-
-# External actors/objects are generated - often safe to ignore
+# External actors/objects (per-level instance data, often regenerated)
 Content/__ExternalActors__/
 Content/__ExternalObjects__/
 
-# Keep project and config files tracked
-!Config/**
-!Content/**
-!Source/**
-!ProjAbyss.uproject
-!README.md
+# Cooked / packaged
+*.Target.cs.user
+
+# =============================================================================
+# Logs & crashes
+# =============================================================================
+
+*.log
+*.dmp
+*.crashlytics
+
+# =============================================================================
+# Python (if using editor scripts)
+# =============================================================================
+
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+*.egg
+
+# =============================================================================
+# Misc
+# =============================================================================
+
+*.tmp
+*.temp
+*.bak
+*.backup
+*.tmp
+.cache/

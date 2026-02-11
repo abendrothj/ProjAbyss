@@ -3,6 +3,9 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "CableComponent.h"
+#include "Components/StaticMeshComponent.h"
 
 AMasterShip::AMasterShip()
 {
@@ -46,14 +49,53 @@ AMasterShip::AMasterShip()
     PontoonBR = CreateDefaultSubobject<USceneComponent>(TEXT("PontoonBR"));
     PontoonBR->SetupAttachment(RootComponent);
     PontoonBR->SetRelativeLocation(FVector(-200.f, 150.f, -50.f));
+
+    // 4. Winch (Diving Bell crane)
+    WinchConstraint = CreateDefaultSubobject<UPhysicsConstraintComponent>(TEXT("WinchConstraint"));
+    WinchConstraint->SetupAttachment(RootComponent);
+    WinchConstraint->SetRelativeLocation(FVector(0.f, 0.f, 150.f));
+    WinchConstraint->SetRelativeRotation(FRotator(180.f, 0.f, 0.f)); // Z axis points down for cable
+
+    WinchCable = CreateDefaultSubobject<UCableComponent>(TEXT("WinchCable"));
+    WinchCable->SetupAttachment(WinchConstraint);
+    WinchCable->NumSegments = 12;
+    WinchCable->CableLength = 500.0f;
+    WinchCable->NumSides = 6;
 }
 
 void AMasterShip::BeginPlay()
 {
     Super::BeginPlay();
 
+    // -- WINCH: Spawn Diving Bell and configure constraint --
+    if (DivingBellClass)
+    {
+        FVector SpawnPos = WinchConstraint->GetComponentLocation() + FVector(0.f, 0.f, -300.f);
+        FRotator SpawnRot = FRotator::ZeroRotator;
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+        SpawnedDivingBell = GetWorld()->SpawnActor<ADivingBell>(DivingBellClass, SpawnPos, SpawnRot, SpawnParams);
+        if (SpawnedDivingBell && SpawnedDivingBell->BellMesh)
+        {
+            // Connect constraint: Ship Hull <-> Bell Mesh
+            WinchConstraint->SetConstrainedComponents(HullMesh, NAME_None, SpawnedDivingBell->BellMesh, NAME_None);
+
+            // Lock X/Y, allow Z travel up to CurrentCableLength
+            WinchConstraint->SetLinearXLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
+            WinchConstraint->SetLinearYLimit(ELinearConstraintMotion::LCM_Locked, 0.f);
+            WinchConstraint->SetLinearZLimit(ELinearConstraintMotion::LCM_Limited, CurrentCableLength);
+
+            WinchConstraint->SetDisableCollision(true);
+            WinchConstraint->InitComponentConstraint();
+
+            // Attach cable end to bell
+            WinchCable->SetAttachEndTo(SpawnedDivingBell, FName("BellMesh"), NAME_None);
+            WinchCable->CableLength = CurrentCableLength;
+        }
+    }
+
     // -- ENHANCED INPUT INITIALIZATION --
-    // This adds the "Keyboard Map" (Context) to the local player so pressing W actually does something.
     if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
     {
         ApplyInputMappingToController(PlayerController);
@@ -98,6 +140,12 @@ void AMasterShip::SetupPlayerInputComponent(UInputComponent* PlayerInputComponen
         {
             EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMasterShip::HandleExitInput);
         }
+
+        // Winch: Axis1D (scroll wheel) - positive = reel in, negative = reel out
+        if (ReelAction)
+        {
+            EnhancedInputComponent->BindAction(ReelAction, ETriggerEvent::Triggered, this, &AMasterShip::ReelIn);
+        }
     }
 }
 
@@ -111,6 +159,34 @@ void AMasterShip::TurnRight(const FInputActionValue& Value)
 {
     // Enhanced Input gives us a float (-1.0 to 1.0)
     CurrentSteering = Value.Get<float>();
+}
+
+void AMasterShip::ReelIn(const FInputActionValue& Value)
+{
+    float Axis = Value.Get<float>();
+    if (Axis > 0.f)
+    {
+        CurrentCableLength = FMath::Max(50.f, CurrentCableLength - ReelSpeed);
+    }
+    else if (Axis < 0.f)
+    {
+        CurrentCableLength = FMath::Min(1000.f, CurrentCableLength + ReelSpeed);
+    }
+
+    if (WinchConstraint)
+    {
+        WinchConstraint->SetLinearZLimit(ELinearConstraintMotion::LCM_Limited, CurrentCableLength);
+    }
+    if (WinchCable)
+    {
+        WinchCable->CableLength = CurrentCableLength;
+    }
+}
+
+void AMasterShip::ReelOut(const FInputActionValue& Value)
+{
+    // Axis1D uses ReelIn for both directions; ReelOut kept for alternate binding if needed
+    ReelIn(Value);
 }
 
 // -- PHYSICS LOOP --
