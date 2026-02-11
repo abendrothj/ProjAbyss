@@ -1,0 +1,40 @@
+# <type>(<scope>): <short description>
+# ---------------------------------------------------------
+# TYPES:
+#   feat     – a new feature
+#   fix      – a bug fix
+#   docs     – documentation changes
+#   style    – formatting, missing semi‑colons, etc. (no code change)
+#   refactor – code change that neither fixes a bug nor adds a feature
+#   test     – adding or updating tests
+#   chore    – maintenance tasks, tooling, CI, etc.
+#
+# SCOPE:
+#   The area of the codebase affected (e.g., ship, character, ocean, interaction)
+#
+# SHORT DESCRIPTION:
+#   Use the imperative mood (“add”, “fix”, “update”, “remove”)
+#   Keep it under 72 characters
+#
+# DETAILED DESCRIPTION (optional):
+#   Provide additional context, reasoning, or implementation notes.
+#   Wrap lines at ~72 characters.
+#
+# REFERENCES (optional):
+#   Link issues, tasks, or tickets (ex, Closes #123, Task #001)
+#
+# ---------------------------------------------------------
+# EXAMPLE:
+# feat(ship): add buoyancy calculation
+#
+# Implemented a new buoyancy model for dynamic ship movement.
+# Improves realism and stability in rough seas.
+#
+# Closes #42
+# ---------------------------------------------------------
+
+<type>(<scope>): <short description>
+
+<detailed description>
+
+Refs: <issue/task IDs>
