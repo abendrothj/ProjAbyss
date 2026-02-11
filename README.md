@@ -203,6 +203,32 @@ This section summarizes the game design and technical plan captured in `proj.md`
   - Shallows (0–50m): Bright, safe (Nanite coral, white sand)
   - Kelp Forest (50–150m): Murky, low visibility (tall Nanite kelp, current motion)
   - Midnight Zone (150m+): Pitch black (basalt rocks, “snow” particles, bioluminescent flora)
+ 
+### Commit Message Template (Conventional Commits)
+- Template Purpose
+- Standardizes commit messages across the team
+- Improves readability of project history
+- Enables automated changelog generation
+- Setup
+- Local (per‑repo): `Bash
+  - git config commit.template .gitmessage
+- Global (all repos): `Bash
+    - git config --global commit.template ~/.gitmessage
+    - Git will automatically load the template when running:
+      - git commit
+- Template Structure
+- Type
+- feat, fix, docs, style, refactor, test, chore
+- Scope
+- Area of code affected (e.g., ship, character, ocean, interaction)
+- Short Description
+- Imperative mood (“add”, “fix”, “update”)
+- Under 72 characters
+- Detailed Description (optional)
+- Additional context, reasoning, or implementation notes
+- References (optional)
+- Issues, tasks, or tickets (e.g., Closes #42, Task #001)
+
 
 ### Development Roadmap (Solo Dev)
 - Phase 1: Foundation (Current)
