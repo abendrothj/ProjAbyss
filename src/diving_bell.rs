@@ -7,8 +7,10 @@ use bevy::scene::SceneRoot;
 use bevy::ui::{AlignItems, FlexDirection, JustifyContent};
 
 use bevy_rapier3d::prelude::*;
+use crate::game_state::GameState;
+use crate::interaction::{Interactable, InteractKind};
 use crate::ocean::OceanSolver;
-use crate::player::PlayerMode;
+use crate::player::{PlayerMode, VEHICLE_ENTER_RANGE};
 use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
 
 const SHIP_ANCHOR_OFFSET: Vec3 = Vec3::new(3.0, 0.0, -2.0);
@@ -53,11 +55,15 @@ impl Plugin for DivingBellPlugin {
             .add_systems(
                 Update,
                 (
-                    diving_bell_oxygen,
-                    submersible_input.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
-                    submersible_movement,
-                    submersible_mouse_look.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
-                    update_oxygen_ui,
+                    diving_bell_oxygen.run_if(in_state(GameState::Playing)),
+                    submersible_input
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| mode.in_submersible),
+                    submersible_movement.run_if(in_state(GameState::Playing)),
+                    submersible_mouse_look
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| mode.in_submersible),
+                    update_oxygen_ui.run_if(in_state(GameState::Playing)),
                 ),
             );
     }
@@ -104,6 +110,10 @@ fn spawn_diving_bell(
             max_oxygen: 100.0,
             current_oxygen: 100.0,
             oxygen_drain_rate: 2.0,
+        },
+        Interactable {
+            kind: InteractKind::EnterSubmersible,
+            range: VEHICLE_ENTER_RANGE,
         },
     ))
     .id();

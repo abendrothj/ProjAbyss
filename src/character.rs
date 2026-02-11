@@ -1,14 +1,17 @@
 //! Marine character - first person, WASD, jump, mouse look.
+//! Oxygen drains when swimming; respawn at Safe Island on drown.
 
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 use bevy::input::mouse::AccumulatedMouseMotion;
+use bevy::ui::{AlignItems, FlexDirection, JustifyContent};
 
 use bevy_rapier3d::prelude::*;
-use crate::ocean::OceanSolver;
+use crate::game_state::GameState;
+use crate::ocean::{OceanSolver, SEA_LEVEL};
 use crate::player::{PlayerCamera, PlayerMode};
-use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
+use crate::world::{character_respawn_position, MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
 
 /// Deck offset from ship center (character stands on ship).
 const SHIP_DECK_OFFSET: Vec3 = Vec3::new(0.0, 0.5, 2.0);
@@ -21,6 +24,11 @@ const SWIM_DRAG: f32 = 4.0;
 /// Stay in swim mode until this far above surface (lets player climb onto ship).
 const SURFACE_EXIT_MARGIN: f32 = 0.6;
 
+/// Depth (m) beyond which pressure increases oxygen drain. Sub required for sustained deep diving.
+const PRESSURE_DEPTH_THRESHOLD: f32 = 50.0;
+/// Oxygen drain multiplier when below pressure threshold (3x = ~20s at 50m+).
+const PRESSURE_DRAIN_MULTIPLIER: f32 = 3.0;
+
 #[derive(Component)]
 pub struct MarineCharacter {
     pub walk_speed: f32,
@@ -29,6 +37,24 @@ pub struct MarineCharacter {
 
 #[derive(Component)]
 pub struct CharacterVelocity(pub Vec3);
+
+/// Oxygen when swimming. Refills at surface; drains underwater. Respawn on drown.
+#[derive(Component)]
+pub struct CharacterOxygen {
+    pub max: f32,
+    pub current: f32,
+    pub drain_rate: f32,
+    pub refill_rate: f32,
+}
+
+#[derive(Component)]
+struct CharacterOxygenBarFill;
+
+#[derive(Resource)]
+struct CharacterOxygenUi {
+    root: Entity,
+    fill: Entity,
+}
 
 /// Horizontal (yaw) and vertical (pitch) look angles in radians.
 #[derive(Component, Default)]
@@ -41,12 +67,20 @@ pub struct CharacterPlugin;
 
 impl Plugin for CharacterPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_character)
+        app.add_systems(Startup, (spawn_character, spawn_character_oxygen_ui))
             .add_systems(
                 Update,
                 (
-                    character_mouse_look.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
-                    character_movement.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
+                    character_mouse_look
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
+                    character_movement
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
+                    character_oxygen
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
+                    update_character_oxygen_ui.run_if(in_state(GameState::Playing)),
                 ),
             );
     }
@@ -76,6 +110,12 @@ fn spawn_character(
             walk_speed: 4.0,
             jump_velocity: 6.0,
         },
+        CharacterOxygen {
+            max: 60.0,
+            current: 60.0,
+            drain_rate: 1.2,
+            refill_rate: 25.0,
+        },
         CharacterVelocity(Vec3::ZERO),
         CharacterLook::default(),
         children![(
@@ -94,6 +134,106 @@ fn spawn_character(
             Transform::from_xyz(0.0, 0.9, 0.0),
         )],
     ));
+}
+
+fn spawn_character_oxygen_ui(mut commands: Commands) {
+    let fill_id = commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.2, 0.6, 0.95, 0.9)),
+            CharacterOxygenBarFill,
+        ))
+        .id();
+    let root_id = commands
+        .spawn((
+            Node {
+                width: Val::Px(200.0),
+                height: Val::Px(24.0),
+                position_type: bevy::ui::PositionType::Absolute,
+                left: Val::Px(20.0),
+                bottom: Val::Px(54.0), // Above sub oxygen bar if both shown; char bar when swimming
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(2.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.1, 0.15, 0.25, 0.9)),
+            Visibility::Hidden,
+        ))
+        .add_child(fill_id)
+        .id();
+    commands.insert_resource(CharacterOxygenUi { root: root_id, fill: fill_id });
+}
+
+fn character_oxygen(
+    ocean: Res<OceanSolver>,
+    mut query: Query<(
+        &mut Transform,
+        &mut CharacterOxygen,
+        &mut CharacterVelocity,
+    ), With<MarineCharacter>>,
+    time: Res<Time>,
+) {
+    for (mut transform, mut oxygen, mut vel) in query.iter_mut() {
+        let pos = transform.translation;
+        let wave_height = ocean.wave_height_at(pos);
+        let underwater = pos.y < wave_height + SURFACE_EXIT_MARGIN;
+
+        if underwater {
+            let depth = SEA_LEVEL - pos.y;
+            let drain_mult = if depth > PRESSURE_DEPTH_THRESHOLD {
+                PRESSURE_DRAIN_MULTIPLIER
+            } else {
+                1.0
+            };
+            oxygen.current = (oxygen.current
+                - oxygen.drain_rate * drain_mult * time.delta_secs())
+                .max(0.0);
+            if oxygen.current <= 0.0 {
+                // Respawn at Safe Island
+                transform.translation = character_respawn_position();
+                oxygen.current = oxygen.max;
+                vel.0 = Vec3::ZERO;
+            }
+        } else {
+            oxygen.current = (oxygen.current + oxygen.refill_rate * time.delta_secs()).min(oxygen.max);
+        }
+    }
+}
+
+fn update_character_oxygen_ui(
+    mode: Res<PlayerMode>,
+    oxygen_ui: Res<CharacterOxygenUi>,
+    character_query: Query<(&Transform, &CharacterOxygen), With<MarineCharacter>>,
+    ocean: Res<OceanSolver>,
+    mut visibility_query: Query<&mut Visibility>,
+    mut fill_query: Query<&mut Node, With<CharacterOxygenBarFill>>,
+) {
+    let mut root_vis = visibility_query.get_mut(oxygen_ui.root).unwrap();
+    if mode.in_vehicle() {
+        *root_vis = Visibility::Hidden;
+        return;
+    }
+    let Ok((transform, oxygen)) = character_query.single() else {
+        *root_vis = Visibility::Hidden;
+        return;
+    };
+    let wave_height = ocean.wave_height_at(transform.translation);
+    let underwater = transform.translation.y < wave_height + SURFACE_EXIT_MARGIN;
+    if !underwater {
+        *root_vis = Visibility::Hidden;
+        return;
+    }
+    *root_vis = Visibility::Visible;
+    let pct = (oxygen.current / oxygen.max).max(0.0).min(1.0);
+    if let Ok(mut fill_node) = fill_query.get_mut(oxygen_ui.fill) {
+        fill_node.width = Val::Percent(pct * 100.0);
+    }
 }
 
 fn character_mouse_look(

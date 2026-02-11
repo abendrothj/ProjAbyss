@@ -172,7 +172,7 @@ How to make Project Abyss a true fusion: **Subnautica** depth, wonder, and thala
 - [ ] **Boids** – Schooling fish. One species, 20–50 fish. Passive.
 - [ ] **Biome scatter** – Depth-based: more kelp in shallows, coral in reefs.
 - [ ] **Shark** – One type. Patrol, chase when close. 2–3 m.
-- [ ] **Character O₂** – Oxygen meter when swimming. Surface to refill.
+- [x] **Character O₂** – Oxygen meter when swimming. Surface to refill. Respawn on drown.
 
 ### Phase 3: Sailing & Weather
 
@@ -182,14 +182,14 @@ How to make Project Abyss a true fusion: **Subnautica** depth, wonder, and thala
 
 ### Phase 4: Extraction & Progression
 
-- [ ] **Artifacts** – Heavy objects. Pick up, attach to winch.
-- [ ] **Inventory** – Small items. Slots.
+- [x] **Artifacts** – Pickable objects (3 on seafloor). Pick up, add to inventory.
+- [x] **Inventory** – Basic (Vec<String>). No UI yet. Expand: attach heavy artifacts to winch.
 - [ ] **Crafting** – O₂ tank, flippers. From kelp, scrap.
 - [ ] **Voyages** – Simple quest: "Find artifact at X."
 
 ### Phase 5: Depth & Biomes
 
-- [ ] **Pressure** – Damage below 50 m without sub.
+- [x] **Pressure** – 3× oxygen drain below 50 m without sub.
 - [ ] **Biome zones** – Kelp forest, wreck zone, midnight. Distinct look.
 - [ ] **Wrecks** – Partial hulls. Loot inside. Barracuda.
 - [ ] **Leviathan (optional)** – Deep only. Roar, chase. Avoid.

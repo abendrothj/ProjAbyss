@@ -1,6 +1,6 @@
 PROJECT ABYSS: GAME DESIGN DOCUMENT & TECHNICAL BIBLE
 
-**Bevy Implementation:** Bevy 0.17 + bevy_rapier3d. Big map: 5km × 5km (MAP_SIZE). Ship (Dynamic + ExternalForce), sub (KinematicVelocityBased), character (KinematicCharacterController). Ocean (Gerstner waves, SEA_LEVEL -2). Islands (FBM blobs, compound shapes, scatter). Winch (RopeJoint). See activity.log for changelog.
+**Bevy Implementation:** Bevy 0.17 + bevy_rapier3d + ron + serde. Big map: 5km × 5km (MAP_SIZE). Ship (Dynamic + ExternalForce), sub (KinematicVelocityBased), character (KinematicCharacterController). Ocean (Gerstner waves, SEA_LEVEL -2). Islands (FBM blobs, compound shapes, scatter). Winch (RopeJoint). **Foundation:** Game states (menu/pause), character oxygen + respawn, pressure (3× drain >50m), generic interaction (EnterShip, EnterSub, Pickup), save/load (F5/F9), artifacts + inventory, audio (pickup). See docs/FOUNDATION.md and activity.log.
 
 ---
 

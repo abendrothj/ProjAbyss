@@ -4,13 +4,22 @@ Documentation index for Project Abyss.
 
 ---
 
+## Foundation & Systems
+
+| Doc | Purpose |
+|-----|---------|
+| **[FOUNDATION.md](FOUNDATION.md)** | All foundational systems: game states, oxygen, save/load, interaction, artifacts, audio. Start here for implementation details. |
+| **[EXPLORATION.md](EXPLORATION.md)** | Depth thresholds, swim vs sub, pressure, oxygen. |
+| **[activity.log](../activity.log)** | Implementation changelog. |
+
+---
+
 ## Design & Vision
 
 | Doc | Purpose |
 |-----|---------|
-| **[DESIGN.md](DESIGN.md)** | Vision, exploration pillar, depth zones, swim vs sub. Start here. |
+| **[DESIGN.md](DESIGN.md)** | Vision, exploration pillar, depth zones, swim vs sub. |
 | **[VISION_SUBNAUTICA_SOT.md](VISION_SUBNAUTICA_SOT.md)** | Subnautica + Sea of Thieves fusion: biomes, fauna, sailing, living world. |
-| **[EXPLORATION.md](EXPLORATION.md)** | Depth thresholds, implementation notes, future pressure/oxygen. |
 | **[SCALE_AUDIT.md](SCALE_AUDIT.md)** | Scale of player, ship, sub, scatter, marine snow. |
 
 ---
@@ -29,4 +38,3 @@ Documentation index for Project Abyss.
 ## Root Files
 
 - **proj.md** – Full design bible (UE5 legacy + Bevy vision)
-- **activity.log** – Implementation changelog

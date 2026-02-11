@@ -7,6 +7,7 @@ use bevy::prelude::*;
 
 use bevy_rapier3d::prelude::*;
 use crate::diving_bell::Submersible;
+use crate::game_state::GameState;
 use crate::player::PlayerMode;
 use crate::ship::Ship;
 
@@ -45,9 +46,11 @@ impl Plugin for WinchPlugin {
         .add_systems(
             Update,
             (
-                winch_controls.run_if(|mode: Res<PlayerMode>| mode.in_boat),
-                update_winch_joint_length,
-                update_cable_visual,
+                winch_controls
+                    .run_if(in_state(GameState::Playing))
+                    .run_if(|mode: Res<PlayerMode>| mode.in_boat),
+                update_winch_joint_length.run_if(in_state(GameState::Playing)),
+                update_cable_visual.run_if(in_state(GameState::Playing)),
             ),
         );
     }

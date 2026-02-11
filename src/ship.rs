@@ -6,8 +6,10 @@ use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 
 use bevy_rapier3d::prelude::*;
+use crate::game_state::GameState;
+use crate::interaction::{Interactable, InteractKind};
 use crate::ocean::OceanSolver;
-use crate::player::PlayerMode;
+use crate::player::{PlayerMode, VEHICLE_ENTER_RANGE};
 use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
 
 /// Ship anchored near Safe Island: offset from island center.
@@ -39,10 +41,14 @@ impl Plugin for ShipPlugin {
             .add_systems(
                 Update,
                 (
-                    ship_buoyancy,
-                    ship_input.run_if(|mode: Res<PlayerMode>| mode.in_boat),
-                    ship_mouse_look.run_if(|mode: Res<PlayerMode>| mode.in_boat),
-                    ship_movement,
+                    ship_buoyancy.run_if(in_state(GameState::Playing)),
+                    ship_input
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| mode.in_boat),
+                    ship_mouse_look
+                        .run_if(in_state(GameState::Playing))
+                        .run_if(|mode: Res<PlayerMode>| mode.in_boat),
+                    ship_movement.run_if(in_state(GameState::Playing)),
                 ),
             );
     }
@@ -76,6 +82,10 @@ fn spawn_ship(
             turn_speed: 3500.0,
             current_throttle: 0.0,
             current_steering: 0.0,
+        },
+        Interactable {
+            kind: InteractKind::EnterShip,
+            range: VEHICLE_ENTER_RANGE,
         },
     ));
 }

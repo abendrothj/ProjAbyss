@@ -6,7 +6,12 @@ use bevy::image::{Image, ImageSampler, ImageSamplerDescriptor};
 use bevy::light::DirectionalLightShadowMap;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
+mod artifacts;
+mod audio;
+mod game_state;
+mod interaction;
 mod ocean;
+mod save_load;
 mod ship;
 mod diving_bell;
 mod winch;
@@ -19,6 +24,7 @@ mod marine_snow;
 
 use bevy_rapier3d::prelude::*;
 
+use game_state::GameStatePlugin;
 use ocean::OceanPlugin;
 use ship::ShipPlugin;
 use diving_bell::DivingBellPlugin;
@@ -32,6 +38,10 @@ fn main() {
         .add_systems(Startup, setup_scene)
         .add_plugins(DefaultPlugins)
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugins(GameStatePlugin)
+        .add_plugins(save_load::SaveLoadPlugin)
+        .add_plugins(artifacts::ArtifactsPlugin)
+        .add_plugins(audio::AudioPlugin)
         .add_plugins(OceanPlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(ShipPlugin)

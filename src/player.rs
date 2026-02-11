@@ -1,16 +1,24 @@
 //! Player mode: on foot (character) vs in boat (ship). E to toggle.
+//! UX: "Press E to enter" prompt when in range; "Press E to exit" when in vehicle.
 
 use bevy::prelude::*;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::post_process::bloom::Bloom;
 use bevy::render::view::{ColorGrading, Hdr};
-use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
+use bevy::text::TextLayout;
 
+use crate::artifacts::Inventory;
+use crate::audio::ArtifactPickupEvent;
 use crate::character::MarineCharacter;
-use crate::diving_bell::Submersible;
+use crate::game_state::GameState;
+use crate::interaction::{
+    nearest_interactable_in_range, nearest_interactable_out_of_range, Interactable, InteractKind,
+};
 use crate::ocean::SEA_LEVEL;
-use crate::ship::Ship;
+
+/// Distance (m) at which E can enter ship or sub.
+pub const VEHICLE_ENTER_RANGE: f32 = 6.0;
 
 #[derive(Resource, Default)]
 pub struct PlayerMode {
@@ -27,28 +35,30 @@ impl PlayerMode {
 #[derive(Component)]
 pub struct PlayerCamera;
 
+#[derive(Component)]
+struct InteractPrompt;
+
+#[derive(Resource)]
+struct InteractPromptRoot(Entity);
+
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PlayerMode::default())
-            .add_systems(Startup, cursor_lock)
-            .add_systems(Update, (
-                toggle_boat_enter,
-                cursor_toggle,
-                update_depth_color_grading,
-                update_depth_fog,
-            ));
+            .add_systems(Startup, spawn_interact_prompt)
+            .add_systems(
+                Update,
+                (
+                    toggle_boat_enter.run_if(in_state(GameState::Playing)),
+                    update_interact_prompt.run_if(in_state(GameState::Playing)),
+                    update_depth_color_grading,
+                    update_depth_fog,
+                ),
+            );
     }
 }
 
-
-fn cursor_lock(mut query: Query<&mut CursorOptions, With<PrimaryWindow>>) {
-    for mut opts in query.iter_mut() {
-        opts.visible = false;
-        opts.grab_mode = CursorGrabMode::Locked;
-    }
-}
 
 /// Depth (m) over which color grading transitions from surface to full deep-blue.
 const DEPTH_COLOR_TRANSITION: f32 = 25.0;
@@ -97,29 +107,101 @@ fn update_depth_fog(
     }
 }
 
-fn cursor_toggle(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut CursorOptions, With<PrimaryWindow>>,
-) {
-    if !keyboard.just_pressed(KeyCode::Escape) {
-        return;
-    }
-    for mut opts in query.iter_mut() {
-        opts.visible = true;
-        opts.grab_mode = CursorGrabMode::None;
-    }
+fn spawn_interact_prompt(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let font = asset_server.load("fonts/FiraSans-Bold.ttf");
+    let text_id = commands
+        .spawn((
+            Text::new(""),
+            TextFont { font, ..default() },
+            TextColor(Color::srgba(1.0, 1.0, 1.0, 0.95)),
+            TextLayout::default(),
+        ))
+        .id();
+    let root_id = commands
+        .spawn((
+            Node {
+                position_type: bevy::ui::PositionType::Absolute,
+                left: Val::Px(0.0),
+                right: Val::Px(0.0),
+                bottom: Val::Px(120.0),
+                height: Val::Px(32.0),
+                justify_content: bevy::ui::JustifyContent::Center,
+                align_items: bevy::ui::AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.05, 0.08, 0.12, 0.75)),
+            InteractPrompt,
+            Visibility::Hidden,
+        ))
+        .add_child(text_id)
+        .id();
+    commands.insert_resource(InteractPromptRoot(root_id));
 }
 
-const VEHICLE_ENTER_RANGE: f32 = 6.0;
+fn update_interact_prompt(
+    mode: Res<PlayerMode>,
+    prompt: Res<InteractPromptRoot>,
+    character_query: Query<&Transform, With<MarineCharacter>>,
+    interactable_query: Query<(Entity, &Transform, &Interactable)>,
+    mut visibility_query: Query<&mut Visibility>,
+    mut text_query: Query<&mut Text>,
+    children_query: Query<&Children>,
+) {
+    let root = prompt.0;
+    let Ok(mut vis) = visibility_query.get_mut(root) else { return };
+    let children = children_query.get(root).ok();
+    let text_entity = children.and_then(|c| c.first().copied()).unwrap_or(root);
+
+    // In vehicle: show "Press E to exit"
+    if mode.in_vehicle() {
+        *vis = Visibility::Visible;
+        if let Ok(mut text) = text_query.get_mut(text_entity) {
+            *text = Text::new("Press E to exit vehicle");
+        }
+        return;
+    }
+
+    // On foot: use generic Interactable system
+    let Ok(char_tf) = character_query.single() else {
+        *vis = Visibility::Hidden;
+        return;
+    };
+    let char_pos = char_tf.translation;
+
+    if let Some((_, kind, _)) =
+        nearest_interactable_in_range(char_pos, interactable_query.iter())
+    {
+        *vis = Visibility::Visible;
+        if let Ok(mut text) = text_query.get_mut(text_entity) {
+            *text = Text::new(kind.prompt());
+        }
+    } else if let Some(_) = nearest_interactable_out_of_range(
+        char_pos,
+        VEHICLE_ENTER_RANGE,
+        15.0,
+        interactable_query.iter(),
+    ) {
+        *vis = Visibility::Visible;
+        if let Ok(mut text) = text_query.get_mut(text_entity) {
+            *text = Text::new(format!(
+                "Move closer to enter ({:.0}m)",
+                VEHICLE_ENTER_RANGE
+            ));
+        }
+    } else {
+        *vis = Visibility::Hidden;
+    }
+}
 
 fn toggle_boat_enter(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut mode: ResMut<PlayerMode>,
+    mut inventory: ResMut<Inventory>,
+    mut pickup_events: MessageWriter<ArtifactPickupEvent>,
     mut commands: Commands,
     camera_query: Query<Entity, With<PlayerCamera>>,
     character_query: Query<(Entity, &Transform), With<MarineCharacter>>,
-    ship_query: Query<(Entity, &Transform), With<Ship>>,
-    sub_query: Query<(Entity, &Transform), With<Submersible>>,
+    interactable_query: Query<(Entity, &Transform, &Interactable)>,
 ) {
     if !keyboard.just_pressed(KeyCode::KeyE) {
         return;
@@ -153,7 +235,7 @@ fn toggle_boat_enter(
         return;
     }
 
-    // On foot -> enter nearest vehicle
+    // On foot -> enter nearest interactable vehicle
     let camera_components = (
         Camera3d::default(),
         Hdr,
@@ -169,38 +251,40 @@ fn toggle_boat_enter(
         PlayerCamera,
     );
 
-    let mut nearest: Option<(f32, bool, Entity)> = None; // (dist_sq, is_boat, entity)
-    if let Some((ship_id, ship_tf)) = ship_query.iter().next() {
-        let d = (ship_tf.translation - char_pos).length_squared();
-        if d <= VEHICLE_ENTER_RANGE * VEHICLE_ENTER_RANGE {
-            nearest = Some((d, true, ship_id));
-        }
-    }
-    if let Some((sub_id, sub_tf)) = sub_query.iter().next() {
-        let d = (sub_tf.translation - char_pos).length_squared();
-        if d <= VEHICLE_ENTER_RANGE * VEHICLE_ENTER_RANGE {
-            if nearest.map(|(nd, _, _)| d < nd).unwrap_or(true) {
-                nearest = Some((d, false, sub_id));
-            }
-        }
-    }
+    let nearest = nearest_interactable_in_range(char_pos, interactable_query.iter());
 
     commands.entity(cam_id).despawn();
-    if let Some((_, is_boat, vehicle_id)) = nearest {
-        if is_boat {
-            mode.in_boat = true;
-            let cam_id = commands.spawn((
-                camera_components,
-                Transform::from_xyz(0.0, 4.0, 12.0).looking_at(Vec3::new(0.0, 0.0, -5.0), Vec3::Y),
-            )).id();
-            commands.entity(vehicle_id).add_children(&[cam_id]);
-        } else {
-            mode.in_submersible = true;
-            let cam_id = commands.spawn((
-                camera_components,
-                Transform::from_xyz(0.0, 1.5, 8.0).looking_at(Vec3::new(0.0, 0.0, -6.0), Vec3::Y),
-            )).id();
-            commands.entity(vehicle_id).add_children(&[cam_id]);
+    if let Some((target_id, kind, _)) = nearest {
+        match kind {
+            InteractKind::EnterShip => {
+                mode.in_boat = true;
+                let cam_id = commands.spawn((
+                    camera_components,
+                    Transform::from_xyz(0.0, 4.0, 12.0).looking_at(Vec3::new(0.0, 0.0, -5.0), Vec3::Y),
+                )).id();
+                commands.entity(target_id).add_children(&[cam_id]);
+            }
+            InteractKind::EnterSubmersible => {
+                mode.in_submersible = true;
+                let cam_id = commands.spawn((
+                    camera_components,
+                    Transform::from_xyz(0.0, 1.5, 8.0).looking_at(Vec3::new(0.0, 0.0, -6.0), Vec3::Y),
+                )).id();
+                commands.entity(target_id).add_children(&[cam_id]);
+            }
+            InteractKind::Pickup { item_id } => {
+                inventory.items.push(item_id.clone());
+                pickup_events.write(ArtifactPickupEvent);
+                commands.entity(target_id).despawn();
+                let cam_id = commands.spawn((camera_components, Transform::from_xyz(0.0, 0.9, 0.0))).id();
+                commands.entity(char_id).add_children(&[cam_id]);
+            }
+            #[allow(unreachable_patterns)]
+            _ => {
+                // Unhandled kind: ensure camera stays on character
+                let cam_id = commands.spawn((camera_components, Transform::from_xyz(0.0, 0.9, 0.0))).id();
+                commands.entity(char_id).add_children(&[cam_id]);
+            }
         }
     } else {
         let cam_id = commands.spawn((

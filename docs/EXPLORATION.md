@@ -36,8 +36,8 @@ This keeps the ocean feel open and explorable. The sub is a tool for reaching th
 
 - **character.rs:** Walk when `pos.y >= wave_height + 0.6` (above surface). Swim when below.
 - **Physics:** No gravity when swimming. 6DOF (WASD + Space/Shift). Water drag.
-- **Oxygen:** Character has no oxygen meter yet. Swimming is unlimited in current build.
-- **Pressure:** No pressure mechanic yet. Deep zones are not enforced.
+- **Oxygen:** Character has oxygen (60 s max, 1.2/s drain when swimming). Refills at surface (25/s). Respawn at Safe Island on drown.
+- **Pressure:** Beyond 50 m depth, oxygen drains 3× faster. Enforces "sub required for deep."
 
 ### 3.2 Submersible
 
@@ -55,23 +55,21 @@ This keeps the ocean feel open and explorable. The sub is a tool for reaching th
 | Use | Threshold | Source |
 |-----|-----------|--------|
 | Swim vs walk | `pos.y < wave_height + 0.6` | character.rs |
+| Character oxygen drain | `pos.y < wave_height + 0.6` | character.rs |
+| Pressure zone (>3× drain) | `depth > 50 m` | character.rs |
 | Sub oxygen drain | `pos.y < wave_height_at(pos)` | diving_bell.rs |
 | Marine snow | `cam.y < wave_height - 0.3` | marine_snow.rs |
 | Depth color/fog | `depth = SEA_LEVEL - y > 0` | player.rs |
 
 ---
 
-## 4. Future: Pressure & Depth Limits
+## 4. Pressure & Depth Limits (Implemented)
 
-To enforce "sub only for excessively deep parts":
+Pressure enforces "sub only for excessively deep parts":
 
-1. **Pressure mechanic:** Beyond ~50m depth, swimming becomes harmful or fatal.
-   - Option A: Damage over time when below threshold.
-   - Option B: Hard "pressure limit" – cannot swim below Xm without sub.
-2. **Oxygen for character:** Add oxygen when swimming (different from sub oxygen).
-   - Surface: refill.
-   - Deep: drain faster.
-3. **Zone-based content:** Spawn artifacts, caves, biomes by depth.
+1. **Pressure mechanic:** Beyond 50 m depth, oxygen drains 3× faster when swimming (~20 s to drown).
+2. **Oxygen for character:** 60 s max, 1.2/s drain (3× at 50 m+). Refills at surface.
+3. **Zone-based content:** Future – spawn artifacts, caves, biomes by depth.
 
 ---
 
@@ -81,7 +79,7 @@ To enforce "sub only for excessively deep parts":
 |------|---------|--------|
 | Surface | Islands, ship, buoys | Same |
 | Shallows | Rocks, seaweed, buoys | Reefs, kelp, small fish |
-| Mid | Debris on seafloor | Wrecks, debris, schools |
+| Mid | Debris, artifacts (3) | Wrecks, debris, schools |
 | Deep | – | Caves, ruins, heavy artifacts |
 | Abyss | Seafloor | Rift entrances, end-game loot |
 
@@ -89,7 +87,7 @@ To enforce "sub only for excessively deep parts":
 
 ## 6. Summary
 
-- **Swim:** 0–50m (target). Currently unlimited.
-- **Sub optional:** 0–50m (convenience).
-- **Sub required:** 50m+ (target). Not yet enforced by pressure.
+- **Swim:** 0–50 m (oxygen limited; pressure zone at 50 m+ drains 3× faster).
+- **Sub optional:** 0–50 m (convenience).
+- **Sub required:** 50 m+ (pressured; swimming very risky).
 - **Design:** Underwater exploration first; sub only for excessively deep parts.
