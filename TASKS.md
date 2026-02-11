@@ -15,7 +15,7 @@ This file tracks development tasks and issues for the Project Abyss team.
 These tasks can be worked on independently without dependencies on other features or systems.
 
 ### Task #001: Add Git Commit Message Template
-**Status:** 🔴 Not Started  
+**Status:** 🟡 Not Started  
 **Assigned to:** @JMiloMartini  
 **Priority:** Low  
 **Type:** Developer Tooling  
