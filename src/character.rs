@@ -5,15 +5,16 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 use bevy::input::mouse::AccumulatedMouseMotion;
 
-use crate::islands::ColliderShape;
+use bevy_rapier3d::prelude::*;
 use crate::ocean::OceanSolver;
 use crate::player::{PlayerCamera, PlayerMode};
 
-const CHARACTER_COLLISION_RADIUS: f32 = 0.5;
 const SWIM_SPEED: f32 = 2.5;
-const SWIM_ASCEND_SPEED: f32 = 3.0;
+const SWIM_ASCEND_SPEED: f32 = 4.0;
 const SWIM_DESCEND_SPEED: f32 = 2.0;
 const SWIM_DRAG: f32 = 4.0;
+/// Stay in swim mode until this far above surface (lets player climb onto ship).
+const SURFACE_EXIT_MARGIN: f32 = 0.6;
 
 #[derive(Component)]
 pub struct MarineCharacter {
@@ -41,7 +42,6 @@ impl Plugin for CharacterPlugin {
                 (
                     character_mouse_look.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
                     character_movement.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
-                    character_island_collision.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
                 ),
             );
     }
@@ -53,9 +53,16 @@ fn spawn_character(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn((
+        RigidBody::KinematicPositionBased,
+        Collider::capsule_y(0.45, 0.4),
+        KinematicCharacterController {
+            offset: CharacterLength::Absolute(0.01),
+            snap_to_ground: Some(CharacterLength::Absolute(0.2)),
+            ..default()
+        },
         Mesh3d(meshes.add(Capsule3d::new(0.4, 0.9))),
         MeshMaterial3d(materials.add(Color::srgb_u8(200, 150, 100))),
-        Transform::from_xyz(3.0, 1.0, 5.0),
+        Transform::from_xyz(0.0, 0.0, 2.0),
         MarineCharacter {
             walk_speed: 4.0,
             jump_velocity: 6.0,
@@ -102,19 +109,26 @@ fn character_mouse_look(
 fn character_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
     ocean: Res<OceanSolver>,
-    mut query: Query<(&MarineCharacter, &mut CharacterVelocity, &mut Transform)>,
+    mut query: Query<(
+        &MarineCharacter,
+        &mut CharacterVelocity,
+        &Transform,
+        &mut KinematicCharacterController,
+    )>,
     time: Res<Time>,
 ) {
     let dt = time.delta_secs();
-    for (char, mut vel, mut transform) in query.iter_mut() {
+    for (char, mut vel, transform, mut controller) in query.iter_mut() {
         let pos = transform.translation;
         let wave_height = ocean.wave_height_at(pos);
-        let underwater = pos.y < wave_height - 0.1;
+        let underwater = pos.y < wave_height + SURFACE_EXIT_MARGIN;
 
         if underwater {
-            // Swimming: slight sink when idle (not neutrally buoyant), Space ascend, Shift descend
-            const SINK_RATE: f32 = 1.8;
-            vel.0.y -= SINK_RATE * dt;
+            // Swimming: sink when idle, Space ascend, Shift descend.
+            // Near surface: neutral buoyancy so player can tread water and climb onto ship.
+            let near_surface = pos.y > wave_height - 0.3;
+            let sink_rate = if near_surface { 0.3 } else { 1.8 };
+            vel.0.y -= sink_rate * dt;
             vel.0.y *= 1.0 - SWIM_DRAG * dt;
 
             if keyboard.pressed(KeyCode::Space) {
@@ -179,49 +193,15 @@ fn character_movement(
             }
         }
 
-        transform.translation += vel.0 * dt;
+        let mut delta = vel.0 * dt;
 
-        // Floor at seafloor
+        // Floor clamp: don't go below seafloor
         const FLOOR_Y: f32 = -80.0;
-        if transform.translation.y < FLOOR_Y {
-            transform.translation.y = FLOOR_Y;
+        if pos.y + delta.y < FLOOR_Y {
+            delta.y = FLOOR_Y - pos.y;
             vel.0.y = 0.0;
         }
-    }
-}
 
-fn character_island_collision(
-    mut char_query: Query<(&mut CharacterVelocity, &mut Transform), With<MarineCharacter>>,
-    collider_query: Query<(&GlobalTransform, &ColliderShape), Without<MarineCharacter>>,
-) {
-    for (mut vel, mut char_tf) in char_query.iter_mut() {
-        let char_pos = char_tf.translation;
-        let margin = CHARACTER_COLLISION_RADIUS;
-
-        for (global, shape) in collider_query.iter() {
-            if let Some(push) = shape.penetration(
-                global.translation(),
-                global.rotation(),
-                char_pos,
-                margin,
-            ) {
-                char_tf.translation += push;
-
-                let push_xz = push.xz();
-                if push_xz.length_squared() > 0.0001 {
-                    let push_dir = push_xz.normalize();
-                    let into = vel.0.x * push_dir.x + vel.0.z * push_dir.y;
-                    if into < 0.0 {
-                        vel.0.x -= into * push_dir.x;
-                        vel.0.z -= into * push_dir.y;
-                    }
-                }
-                if push.y.abs() > 0.0001 {
-                    if vel.0.y * push.y < 0.0 {
-                        vel.0.y = 0.0;
-                    }
-                }
-            }
-        }
+        controller.translation = Some(delta);
     }
 }

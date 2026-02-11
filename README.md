@@ -2,7 +2,7 @@
 
 Co-op extraction survival. Sail → Scan → Dive → Extract.
 
-**Bevy + Rust. Pure code. All in.**
+**Bevy 0.17 + Rapier + Rust.**
 
 ## Requirements
 
@@ -17,22 +17,28 @@ cargo run
 
 ## Controls
 
-- **WASD** – Ship throttle & steer (ship) / Move (character)
-- **Space** – Jump (character)
+| Mode | Action |
+|------|--------|
+| **Character** | WASD move, Space jump, Mouse look |
+| **Ship** | WASD throttle/steer, Mouse look, E enter/exit |
+| **Submersible** | WASD drive, Space/Shift ascend/descend, Mouse look, E enter/exit |
+| **Global** | E – enter/exit vehicle, Escape – release cursor |
 
 ## Structure
 
 | Module | What |
 |--------|------|
-| `ocean.rs` | Gerstner wave solver for buoyancy |
-| `ship.rs` | Ship with buoyancy, engine, pontoons |
-| `diving_bell.rs` | Bell with oxygen drain underwater |
-| `character.rs` | First-person marine character |
+| `ocean.rs` | Gerstner waves, water mesh, SEA_LEVEL |
+| `ship.rs` | Dynamic ship, ExternalForce buoyancy, engine |
+| `diving_bell.rs` | Submersible, oxygen drain, KinematicVelocityBased |
+| `character.rs` | First-person, KinematicCharacterController, swim |
+| `player.rs` | Mode switching, camera, depth color/fog |
+| `islands.rs` | Organic blobs, compound shapes, FBM noise |
+| `scatter.rs` | Rocks, seaweed, debris, buoys |
+| `marine_snow.rs` | Underwater particles |
 
 ## Notes
 
-- Manual physics (no Rapier) – ship/character use velocity components
-- Wave height at Y=0, Bevy Y-up
-- Same wave math as Unreal/Godot versions
-- Winch + joints: add later with bevy_rapier3d or custom constraint
-- Vision: Sea of Thieves ocean + Subnautica depth (underwater life, flora, biomes, fauna)
+- **Physics:** bevy_rapier3d for ship, sub, character, islands, seafloor
+- **Water:** Surface at SEA_LEVEL (-2), no collider (player falls through)
+- **Vision:** Sea of Thieves ocean + Subnautica depth (biomes, fauna)

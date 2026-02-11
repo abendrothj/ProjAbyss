@@ -2,8 +2,7 @@
 
 use bevy::prelude::*;
 use bevy::asset::RenderAssetUsages;
-use bevy::image::ImageSamplerDescriptor;
-use bevy::image::{Image, ImageAddressMode, ImageFilterMode, ImageSampler};
+use bevy::image::{Image, ImageSampler, ImageSamplerDescriptor};
 use bevy::mesh::VertexAttributeValues;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
@@ -41,6 +40,9 @@ impl GerstnerWave {
     }
 }
 
+/// Sea level (Y). Water surface oscillates around this.
+pub const SEA_LEVEL: f32 = -2.0;
+
 /// Ocean solver resource - wave height at any position.
 #[derive(Resource)]
 pub struct OceanSolver {
@@ -51,9 +53,9 @@ pub struct OceanSolver {
 impl Default for OceanSolver {
     fn default() -> Self {
         let waves = vec![
-            GerstnerWave::new(60.0, 1.5, 4.0, Vec2::new(1.0, 0.2), 0.4),
-            GerstnerWave::new(35.0, 0.8, 2.5, Vec2::new(0.7, 0.7), 0.6),
-            GerstnerWave::new(15.0, 0.4, 3.5, Vec2::new(0.2, 1.0), 0.8),
+            GerstnerWave::new(60.0, 0.6, 4.0, Vec2::new(1.0, 0.2), 0.4),
+            GerstnerWave::new(35.0, 0.35, 2.5, Vec2::new(0.7, 0.7), 0.6),
+            GerstnerWave::new(15.0, 0.2, 3.5, Vec2::new(0.2, 1.0), 0.8),
         ];
         Self { time: 0.0, waves }
     }
@@ -63,12 +65,13 @@ impl OceanSolver {
     /// Returns water surface height (Y) at world position.
     /// Bevy: Y is up, horizontal plane is XZ.
     pub fn wave_height_at(&self, pos: Vec3) -> f32 {
-        self.waves.iter().fold(0.0, |acc, wave| {
+        let wave_offset = self.waves.iter().fold(0.0, |acc, wave| {
             let freq = wave.frequency();
             let phase = wave.phase_constant() * self.time;
             let projected = pos.x * wave.direction.x + pos.z * wave.direction.y;
             acc + (wave.amplitude * wave.steepness) * (freq * projected + phase).sin()
-        })
+        });
+        SEA_LEVEL + wave_offset
     }
 }
 
@@ -125,10 +128,7 @@ fn create_water_normal_map(size: u32) -> Image {
         TextureFormat::Rgba8Unorm,
         RenderAssetUsages::default(),
     );
-    let mut sampler_desc = ImageSamplerDescriptor::default();
-    sampler_desc.set_filter(ImageFilterMode::Linear);
-    sampler_desc.set_address_mode(ImageAddressMode::Repeat);
-    image.sampler = ImageSampler::Descriptor(sampler_desc);
+    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::default());
     image
 }
 
@@ -157,7 +157,7 @@ fn spawn_water(
     }
 
     let n = WAVE_GRID * WAVE_GRID;
-    let water_tint = [0.15, 0.4, 0.65, 0.92];
+    let water_tint = [0.2, 0.4, 0.6, 0.98];
     plane_mesh.insert_attribute(
         Mesh::ATTRIBUTE_COLOR,
         (0..n).map(|_| water_tint).collect::<Vec<[f32; 4]>>(),
@@ -166,13 +166,13 @@ fn spawn_water(
 
     let water_normal = images.add(create_water_normal_map(128));
     let water_material = materials.add(StandardMaterial {
-        base_color: Color::srgba(1.0, 1.0, 1.0, 1.0),
+        base_color: Color::srgba(0.08, 0.25, 0.45, 0.95),
         perceptual_roughness: 0.02,
         metallic: 0.0,
         alpha_mode: AlphaMode::Blend,
         reflectance: 0.5,
-        specular_transmission: 0.15,
-        thickness: 0.8,
+        specular_transmission: 0.2,
+        thickness: 2.0,
         normal_map_texture: Some(water_normal),
         ..default()
     });
@@ -197,7 +197,7 @@ fn update_water_mesh(
     let Some(mesh) = meshes.get_mut(&handle.0) else { return };
     let n = WAVE_GRID;
     let cell_size = 1500.0 / 65.0; // 65 cells between 66 vertices (subdivisions=64)
-    let water_tint = [0.15, 0.4, 0.65, 0.92];
+    let water_tint = [0.2, 0.4, 0.6, 0.98];
     let foam_tint = [1.0, 1.0, 1.0, 1.0];
     let steepness_lo = 0.012;
     let steepness_hi = 0.06;

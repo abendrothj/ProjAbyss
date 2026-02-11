@@ -2,13 +2,15 @@
 
 > Moving from the current primitive look to a Sea of Thieves / Subnautica–inspired visual style using Bevy's rendering stack.
 
-## Current State
+**Engine:** Bevy 0.17
 
-- **Ocean:** Subdivided plane, CPU vertex updates (Gerstner waves), basic `StandardMaterial` (solid color, alpha, reflectance)
-- **Lighting:** DirectionalLight (25k illuminance, 4096 shadow map), PointLight fill, GlobalAmbientLight. HDR + Tonemapping::AgX
-- **Materials:** Flat `srgb` colors, roughness/metallic on PBR. No textures or normal maps
-- **Islands:** Procedural blobs + compound shapes (Cuboid, Cone, Sphere, Torus). No scatter or detail
-- **Post-processing:** Tonemapping only. No Bloom, fog, or depth effects
+## Current State (2026-02)
+
+- **Ocean:** Subdivided plane, CPU vertex updates (Gerstner waves), foaming at crests (vertex colors), procedural normal map (24× tiling), SEA_LEVEL -2
+- **Lighting:** DirectionalLight (25k illuminance, 4096 shadow map), PointLight fill, AmbientLight. HDR + Tonemapping::AgX
+- **Materials:** Procedural 64×64 noise on islands/rocks; PBR with roughness/metallic
+- **Islands:** FBM organic blobs, compound shapes (Cone, Cuboid), scatter (rocks, seaweed, debris, buoys)
+- **Post-processing:** Tonemapping, Bloom, DistanceFog, depth-based ColorGrading, marine snow
 
 ---
 
@@ -92,7 +94,7 @@
 
 ## References
 
-- [Bevy 0.18 Material](https://docs.rs/bevy/0.18.0/bevy/render/mesh/struct.Mesh.html)
-- [Bevy Bloom](https://docs.rs/bevy/latest/bevy/core_pipeline/bloom/struct.BloomSettings.html)
+- [Bevy 0.17](https://docs.rs/bevy/0.17.0/bevy/)
+- [Bevy Bloom](https://docs.rs/bevy/latest/bevy/post_process/bloom/struct.Bloom.html)
 - [Bevy Custom Shaders](https://bevyengine.org/learn/book/assets/shaders/)
 - [proj.md](../proj.md) – Design bible (depth absorption, MegaLights → Bevy equivalents)

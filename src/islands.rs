@@ -5,83 +5,13 @@
 
 use bevy::mesh::VertexAttributeValues;
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 /// Collision shape for islands. Used for ship and character collision.
 #[derive(Component)]
 pub struct IslandCollider {
     /// Radius for scatter placement and broad-phase (kept for compatibility).
     pub radius: f32,
-}
-
-/// Per-part collision shape matching the visible mesh. Used for accurate collision.
-#[derive(Component, Clone)]
-pub enum ColliderShape {
-    /// Flat disc (cylinder) – for organic blobs, sand rings, atoll.
-    Disc { radius: f32, half_height: f32 },
-    /// Oriented box – for compound cuboid parts.
-    Box { half_extents: Vec3 },
-    /// Cylinder – for cone parts (approximated).
-    Cylinder { radius: f32, half_height: f32 },
-}
-
-impl ColliderShape {
-    /// If `point` is inside this shape (with `margin`), returns the push vector to escape.
-    pub fn penetration(&self, center: Vec3, rotation: Quat, point: Vec3, margin: f32) -> Option<Vec3> {
-        match self {
-            ColliderShape::Disc { radius, half_height } => {
-                let delta_xz = point.xz() - center.xz();
-                let dist_xz = delta_xz.length();
-                let in_radius = dist_xz < radius + margin;
-                let in_height = point.y >= center.y - half_height - margin
-                    && point.y <= center.y + half_height + margin;
-                if in_radius && in_height {
-                    let push_xz = if dist_xz > 0.001 {
-                        (radius + margin - dist_xz) * (delta_xz / dist_xz)
-                    } else {
-                        Vec2::new(radius + margin, 0.0)
-                    };
-                    Some(Vec3::new(push_xz.x, 0.0, push_xz.y))
-                } else {
-                    None
-                }
-            }
-            ColliderShape::Box { half_extents } => {
-                let rel = rotation.inverse() * (point - center);
-                let px = (half_extents.x + margin) - rel.x.abs();
-                let py = (half_extents.y + margin) - rel.y.abs();
-                let pz = (half_extents.z + margin) - rel.z.abs();
-                if px > 0.0 && py > 0.0 && pz > 0.0 {
-                    let (min_p, axis) = if px <= py && px <= pz {
-                        (px, Vec3::new(rel.x.signum(), 0.0, 0.0))
-                    } else if py <= px && py <= pz {
-                        (py, Vec3::new(0.0, rel.y.signum(), 0.0))
-                    } else {
-                        (pz, Vec3::new(0.0, 0.0, rel.z.signum()))
-                    };
-                    Some(rotation * (axis * min_p))
-                } else {
-                    None
-                }
-            }
-            ColliderShape::Cylinder { radius, half_height } => {
-                let delta_xz = point.xz() - center.xz();
-                let dist_xz = delta_xz.length();
-                let in_radius = dist_xz < radius + margin;
-                let in_height = point.y >= center.y - half_height - margin
-                    && point.y <= center.y + half_height + margin;
-                if in_radius && in_height {
-                    let push_xz = if dist_xz > 0.001 {
-                        (radius + margin - dist_xz) * (delta_xz / dist_xz)
-                    } else {
-                        Vec2::new(radius + margin, 0.0)
-                    };
-                    Some(Vec3::new(push_xz.x, 0.0, push_xz.y))
-                } else {
-                    None
-                }
-            }
-        }
-    }
 }
 
 /// Marks the spawn/safe island where players stock the ship (proj design doc).
@@ -219,22 +149,26 @@ fn spawn_compound(
         .id();
     for (kind, local_pos, local_scale, is_rock) in parts.iter() {
         let (mesh, collider) = match kind {
-            PartKind::Cuboid(s) => (
-                Cuboid::new(s.x, s.y, s.z).mesh().build(),
-                ColliderShape::Box {
-                    half_extents: *local_scale * 0.5,
-                },
-            ),
-            PartKind::Cone { radius, height } => (
-                Cone::new(*radius, *height).mesh().resolution(24).build(),
-                ColliderShape::Cylinder {
-                    radius: radius * local_scale.x,
-                    half_height: height * local_scale.y * 0.5,
-                },
-            ),
+            PartKind::Cuboid(s) => {
+                let he = *local_scale * 0.5;
+                (
+                    Cuboid::new(s.x, s.y, s.z).mesh().build(),
+                    Collider::cuboid(he.x, he.y, he.z),
+                )
+            }
+            PartKind::Cone { radius, height } => {
+                let r = radius * local_scale.x;
+                let h = height * local_scale.y * 0.5;
+                (
+                    Cone::new(*radius, *height).mesh().resolution(24).build(),
+                    Collider::cylinder(h, r),
+                )
+            }
         };
         let child = commands
             .spawn((
+                RigidBody::Fixed,
+                collider,
                 Mesh3d(meshes.add(mesh)),
                 MeshMaterial3d(if *is_rock {
                     rock_mat.clone()
@@ -242,7 +176,6 @@ fn spawn_compound(
                     island_mat.clone()
                 }),
                 Transform::from_translation(*local_pos).with_scale(*local_scale),
-                collider,
             ))
             .id();
         commands.entity(parent).add_child(child);
@@ -260,18 +193,20 @@ pub fn spawn_all_islands(
     // Procedural organic blob island
     let organic_mesh = create_organic_blob_mesh(meshes, 35.0, 24, 1.23, 0.22);
     commands.spawn((
+        RigidBody::Fixed,
+        Collider::cylinder(2.0, 45.0),
         Mesh3d(organic_mesh),
         MeshMaterial3d(island_mat.clone()),
         Transform::from_xyz(-120.0, 0.0, -200.0),
         IslandCollider { radius: 45.0 },
-        ColliderShape::Disc { radius: 45.0, half_height: 2.0 },
     ));
     commands.spawn((
+        RigidBody::Fixed,
+        Collider::cylinder(0.35, 50.0),
         Mesh3d(meshes.add(Cylinder::new(50.0, 0.6))),
         MeshMaterial3d(sand_mat.clone()),
         Transform::from_xyz(-120.0, 0.0, -200.0),
         IslandCollider { radius: 50.0 },
-        ColliderShape::Disc { radius: 50.0, half_height: 0.35 },
     ));
 
     // Volcanic cay: flat cone + low boulders (Caribbean style)
@@ -315,6 +250,8 @@ pub fn spawn_all_islands(
         .id();
     let torus_id = commands
         .spawn((
+            RigidBody::Fixed,
+            Collider::cylinder(0.8, 26.0),
             Mesh3d(meshes.add(
                 Torus::new(20.0, 6.0)
                     .mesh()
@@ -323,15 +260,15 @@ pub fn spawn_all_islands(
             )),
             MeshMaterial3d(sand_mat.clone()),
             Transform::default().with_scale(Vec3::new(1.0, 0.12, 1.0)),
-            ColliderShape::Disc { radius: 26.0, half_height: 0.8 },
         ))
         .id();
     let islet_id = commands
         .spawn((
+            RigidBody::Fixed,
+            Collider::cylinder(0.5, 5.0),
             Mesh3d(meshes.add(Sphere::new(6.0).mesh().uv(16, 12))),
             MeshMaterial3d(island_mat.clone()),
             Transform::from_xyz(0.0, 0.4, 0.0).with_scale(Vec3::new(1.0, 0.08, 1.0)),
-            ColliderShape::Disc { radius: 5.0, half_height: 0.5 },
         ))
         .id();
     commands.entity(parent).add_child(torus_id);
@@ -340,18 +277,20 @@ pub fn spawn_all_islands(
     // Organic coastal island
     let blob2 = create_organic_blob_mesh(meshes, 28.0, 20, 4.56, 0.25);
     commands.spawn((
+        RigidBody::Fixed,
+        Collider::cylinder(1.8, 35.0),
         Mesh3d(blob2),
         MeshMaterial3d(island_mat.clone()),
         Transform::from_xyz(300.0, 0.0, -80.0),
         IslandCollider { radius: 35.0 },
-        ColliderShape::Disc { radius: 35.0, half_height: 1.8 },
     ));
     commands.spawn((
+        RigidBody::Fixed,
+        Collider::cylinder(0.3, 32.0),
         Mesh3d(meshes.add(Cylinder::new(32.0, 0.5))),
         MeshMaterial3d(sand_mat.clone()),
         Transform::from_xyz(300.0, 0.0, -80.0),
         IslandCollider { radius: 32.0 },
-        ColliderShape::Disc { radius: 32.0, half_height: 0.3 },
     ));
 
     // Flat cay: low plateau + rocks
@@ -375,8 +314,9 @@ pub fn spawn_all_islands(
         Mesh3d(blob3),
         MeshMaterial3d(island_mat.clone()),
         Transform::from_xyz(50.0, 0.0, 280.0),
+        RigidBody::Fixed,
+        Collider::cylinder(1.4, 28.0),
         IslandCollider { radius: 28.0 },
-        ColliderShape::Disc { radius: 28.0, half_height: 1.4 },
     ));
 
     // Long reef: multiple segments
@@ -415,16 +355,18 @@ pub fn spawn_all_islands(
         Mesh3d(blob_spawn),
         MeshMaterial3d(island_mat.clone()),
         Transform::from_xyz(-15.0, 0.0, 10.0),
+        RigidBody::Fixed,
+        Collider::cylinder(0.8, 14.0),
         IslandCollider { radius: 14.0 },
-        ColliderShape::Disc { radius: 14.0, half_height: 0.8 },
         SafeIsland,
     ));
     commands.spawn((
         Mesh3d(meshes.add(Cylinder::new(14.0, 0.4))),
         MeshMaterial3d(sand_mat.clone()),
         Transform::from_xyz(-15.0, 0.0, 10.0),
+        RigidBody::Fixed,
+        Collider::cylinder(0.2, 14.0),
         IslandCollider { radius: 14.0 },
-        ColliderShape::Disc { radius: 14.0, half_height: 0.2 },
         SafeIsland,
     ));
 }

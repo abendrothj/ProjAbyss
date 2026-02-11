@@ -2,8 +2,7 @@
 
 use bevy::prelude::*;
 use bevy::asset::RenderAssetUsages;
-use bevy::image::ImageSamplerDescriptor;
-use bevy::image::{Image, ImageAddressMode, ImageFilterMode, ImageSampler};
+use bevy::image::{Image, ImageSampler, ImageSamplerDescriptor};
 use bevy::light::DirectionalLightShadowMap;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
@@ -16,12 +15,13 @@ mod islands;
 mod scatter;
 mod marine_snow;
 
+use bevy_rapier3d::prelude::*;
+
 use ocean::OceanPlugin;
 use ship::ShipPlugin;
 use diving_bell::DivingBellPlugin;
 use character::CharacterPlugin;
 use player::PlayerPlugin;
-use islands::ColliderShape;
 
 fn main() {
     App::new()
@@ -29,6 +29,7 @@ fn main() {
         .insert_resource(DirectionalLightShadowMap { size: 4096 })
         .add_systems(Startup, setup_scene)
         .add_plugins(DefaultPlugins)
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(OceanPlugin)
         .add_plugins(PlayerPlugin)
         .add_plugins(ShipPlugin)
@@ -62,10 +63,7 @@ fn create_terrain_noise_texture(size: u32, base_r: f32, base_g: f32, base_b: f32
         TextureFormat::Rgba8Unorm,
         RenderAssetUsages::default(),
     );
-    let mut sampler_desc = ImageSamplerDescriptor::default();
-    sampler_desc.set_filter(ImageFilterMode::Linear);
-    sampler_desc.set_address_mode(ImageAddressMode::Repeat);
-    image.sampler = ImageSampler::Descriptor(sampler_desc);
+    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor::default());
     image
 }
 
@@ -76,7 +74,7 @@ fn setup_scene(
     mut images: ResMut<Assets<Image>>,
 ) {
     // Ambient light – warm sky fill
-    commands.insert_resource(GlobalAmbientLight {
+    commands.insert_resource(AmbientLight {
         color: Color::srgb(0.65, 0.78, 0.95),
         brightness: 500.0,
         ..default()
@@ -112,9 +110,8 @@ fn setup_scene(
         ..default()
     });
     commands.spawn((
-        ColliderShape::Box {
-            half_extents: Vec3::new(800.0, 0.5, 800.0),
-        },
+        RigidBody::Fixed,
+        Collider::cuboid(800.0, 0.5, 800.0),
         Mesh3d(seafloor_mesh),
         MeshMaterial3d(seafloor_mat),
         Transform::from_xyz(0.0, -80.5, 0.0),

@@ -5,4 +5,5 @@ edition = "2021"
 description = "Co-op extraction survival. Sail -> Scan -> Dive -> Extract."
 
 [dependencies]
-bevy = { version = "0.18", features = ["bevy_post_process"] }
+bevy = { version = "0.17", features = ["bevy_post_process"] }
+bevy_rapier3d = "0.32"

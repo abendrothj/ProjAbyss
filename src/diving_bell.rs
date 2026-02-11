@@ -5,11 +5,9 @@ use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
 use bevy::scene::SceneRoot;
 
-use crate::islands::ColliderShape;
+use bevy_rapier3d::prelude::*;
+use crate::ocean::SEA_LEVEL;
 use crate::player::PlayerMode;
-
-/// Collision radius for submersible hull.
-const SUB_COLLISION_RADIUS: f32 = 2.0;
 
 #[derive(Component)]
 pub struct Submersible {
@@ -43,7 +41,6 @@ impl Plugin for DivingBellPlugin {
                     submersible_input.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
                     submersible_mouse_look.run_if(|mode: Res<PlayerMode>| mode.in_submersible),
                     submersible_movement,
-                    submersible_island_collision,
                 ),
             );
     }
@@ -67,12 +64,12 @@ fn spawn_diving_bell(
 
     let sub_id = commands
         .spawn((
+            RigidBody::KinematicVelocityBased,
+            Collider::cylinder(3.0, 2.5),
+            GravityScale(0.0),
+            Velocity::default(),
             SceneRoot(scene),
             Transform::from_xyz(0.0, -4.0, -25.0).with_scale(Vec3::splat(4.0)),
-            ColliderShape::Cylinder {
-                radius: 2.5,
-                half_height: 3.0,
-            },
             Submersible {
             drive_power: 15.0,
             turn_speed: 1.2,
@@ -98,27 +95,28 @@ fn diving_bell_oxygen(
     time: Res<Time>,
 ) {
     for (transform, mut bell) in query.iter_mut() {
-        if transform.translation.y < 0.0 {
+        if transform.translation.y < SEA_LEVEL {
             bell.current_oxygen = (bell.current_oxygen - bell.oxygen_drain_rate * time.delta_secs()).max(0.0);
         }
     }
 }
 
 fn submersible_movement(
-    mut query: Query<(&Submersible, &mut SubmersibleVelocity, &mut Transform)>,
+    mut query: Query<(&Submersible, &mut SubmersibleVelocity, &mut Transform, &mut Velocity)>,
     time: Res<Time>,
 ) {
     const WATER_DRAG: f32 = 0.95;    // decay when idle; sub holds depth/position (neutral buoyancy)
 
-    for (sub, mut vel, mut transform) in query.iter_mut() {
+    for (sub, mut vel, transform, mut rb_vel) in query.iter_mut() {
         let forward = transform.forward();
         vel.0 += forward * sub.drive_power * sub.current_throttle * time.delta_secs();
         vel.0.y += sub.ascend_speed * sub.current_vertical * time.delta_secs();
 
         // Neutral buoyancy: no input = no sink/rise. Sub is trim-able and holds depth.
-        transform.rotate_y(sub.turn_speed * sub.current_steering * time.delta_secs());
-        transform.translation += vel.0 * time.delta_secs();
         vel.0 *= WATER_DRAG;
+
+        rb_vel.linvel = vel.0;
+        rb_vel.angvel = Vec3::new(0.0, sub.turn_speed * sub.current_steering, 0.0);
     }
 }
 
@@ -165,38 +163,3 @@ fn submersible_mouse_look(
     }
 }
 
-fn submersible_island_collision(
-    mut sub_query: Query<(&mut SubmersibleVelocity, &mut Transform), With<Submersible>>,
-    collider_query: Query<(&GlobalTransform, &ColliderShape), Without<Submersible>>,
-) {
-    for (mut vel, mut sub_tf) in sub_query.iter_mut() {
-        let sub_pos = sub_tf.translation;
-        let margin = SUB_COLLISION_RADIUS;
-
-        for (global, shape) in collider_query.iter() {
-            if let Some(push) = shape.penetration(
-                global.translation(),
-                global.rotation(),
-                sub_pos,
-                margin,
-            ) {
-                sub_tf.translation += push;
-
-                let push_xz = push.xz();
-                if push_xz.length_squared() > 0.0001 {
-                    let push_dir = push_xz.normalize();
-                    let into = vel.0.x * push_dir.x + vel.0.z * push_dir.y;
-                    if into < 0.0 {
-                        vel.0.x -= into * push_dir.x;
-                        vel.0.z -= into * push_dir.y;
-                    }
-                }
-                if push.y.abs() > 0.001 {
-                    if vel.0.y * push.y < 0.0 {
-                        vel.0.y = 0.0;
-                    }
-                }
-            }
-        }
-    }
-}

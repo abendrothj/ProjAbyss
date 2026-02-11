@@ -9,6 +9,7 @@ use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
 use crate::character::MarineCharacter;
 use crate::diving_bell::Submersible;
+use crate::ocean::SEA_LEVEL;
 use crate::ship::Ship;
 
 #[derive(Resource, Default)]
@@ -49,14 +50,19 @@ fn cursor_lock(mut query: Query<&mut CursorOptions, With<PrimaryWindow>>) {
     }
 }
 
+/// Depth (m) over which color grading transitions from surface to full deep-blue.
+const DEPTH_COLOR_TRANSITION: f32 = 25.0;
+
 fn update_depth_color_grading(
     mut camera_query: Query<(&mut ColorGrading, &GlobalTransform), With<PlayerCamera>>,
 ) {
     for (mut grading, global) in camera_query.iter_mut() {
         let y = global.translation().y;
-        // Stronger depth absorption: red fades first, blue dominates (design bible: 10m–100m)
-        let depth_factor = if y < 0.0 {
-            ((-y).min(80.0) / 80.0).powf(0.7)
+        let depth = SEA_LEVEL - y;
+        let depth_factor = if depth > 0.0 {
+            let t = (depth / DEPTH_COLOR_TRANSITION).min(1.0);
+            let smooth = t * t * (3.0 - 2.0 * t);
+            (depth.min(80.0) / 80.0).powf(0.6) * smooth
         } else {
             0.0
         };
@@ -71,10 +77,18 @@ fn update_depth_fog(
     use bevy::pbr::FogFalloff;
     for (mut fog, global) in camera_query.iter_mut() {
         let y = global.translation().y;
-        if y < 0.0 {
-            let depth = (-y).min(80.0);
-            let density = 0.008 + 0.018 * (depth / 80.0);
-            fog.color = Color::srgba(0.2, 0.35, 0.6, 0.35);
+        let depth = SEA_LEVEL - y;
+        if depth > 0.0 {
+            let d = depth.min(80.0);
+            let density = 0.006 + 0.012 * (d / 80.0).powf(0.7);
+            let t = (depth / DEPTH_COLOR_TRANSITION).min(1.0);
+            let smooth = t * t * (3.0 - 2.0 * t);
+            fog.color = Color::srgba(
+                0.2 * smooth + 0.5 * (1.0 - smooth),
+                0.35 * smooth + 0.6 * (1.0 - smooth),
+                0.6 * smooth + 0.8 * (1.0 - smooth),
+                0.35 * smooth + 0.2 * (1.0 - smooth),
+            );
             fog.falloff = FogFalloff::Exponential { density };
         } else {
             fog.color = Color::srgba(0.5, 0.6, 0.8, 0.2);

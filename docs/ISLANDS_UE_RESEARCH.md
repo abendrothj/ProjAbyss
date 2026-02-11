@@ -82,13 +82,14 @@ From `proj.md`:
 
 ---
 
-## 5. Bevy Refinements (2025-02-10)
+## 5. Bevy Refinements (2026-02)
 
 Applied after research:
 
 - **Multi-octave noise (FBM)**: Organic blobs use 3-octave fractal Brownian motion instead of single-octave smooth noise. More natural coastline and terrain variation.
 - **Data-driven layout**: `spawn_all_islands()` moved into `islands.rs`; `main.rs` only passes material handles. PartKind and spawn_compound are internal helpers.
 - **SafeIsland component**: Spawn island at (-15, 0, 10) marked with `SafeIsland` for future gameplay (stocking ship, spawn point).
+- **Rapier colliders**: All islands use `RigidBody::Fixed` + `Collider` (cylinder, cuboid); `IslandCollider` retained for scatter placement.
 - **Plane-cut deferred**: Clipping sphere at Y=0 would require mesh surgery; left for later.
 
 ---
