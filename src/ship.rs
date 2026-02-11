@@ -1,19 +1,23 @@
 //! Ship with buoyancy, engine. Pure Rust, no physics plugin.
 
+use bevy::gltf::GltfAssetLabel;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
+use bevy::scene::SceneRoot;
 
-use crate::islands::IslandCollider;
+use crate::islands::ColliderShape;
 use crate::ocean::OceanSolver;
 use crate::player::PlayerMode;
 
-const SHIP_COLLISION_RADIUS: f32 = 10.0;
+/// Collision radius for the rowboat hull.
+const SHIP_COLLISION_RADIUS: f32 = 4.0;
 
+/// Hull corners for buoyancy (rowboat ≈ 2.5 scale).
 const PONTOON_OFFSETS: [Vec3; 4] = [
-    Vec3::new(-1.5, -0.5, -2.0),
-    Vec3::new(1.5, -0.5, -2.0),
-    Vec3::new(-1.5, -0.5, 2.0),
-    Vec3::new(1.5, -0.5, 2.0),
+    Vec3::new(-0.9, -0.25, -1.5),
+    Vec3::new(0.9, -0.25, -1.5),
+    Vec3::new(-0.9, -0.25, 1.5),
+    Vec3::new(0.9, -0.25, 1.5),
 ];
 
 #[derive(Component)]
@@ -52,18 +56,15 @@ impl Plugin for ShipPlugin {
 
 fn spawn_ship(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
 ) {
+    let scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/boat-row-small.glb"));
     commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(8.0, 2.0, 15.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.45, 0.35, 0.25),
-            perceptual_roughness: 0.7,
-            metallic: 0.05,
-            ..default()
-        })),
-        Transform::from_xyz(0.0, 2.0, 0.0),
+        SceneRoot(scene),
+        Transform::from_xyz(0.0, 1.5, 0.0).with_scale(Vec3::splat(2.5)),
+        ColliderShape::Box {
+            half_extents: Vec3::new(2.5, 0.7, 4.0),
+        },
         Ship {
             float_force: 4000.0,
             water_drag: 2.0,
@@ -150,30 +151,30 @@ fn ship_mouse_look(
 
 fn ship_island_collision(
     mut ship_query: Query<(&mut ShipVelocity, &mut Transform), With<Ship>>,
-    island_query: Query<(&Transform, &IslandCollider), Without<Ship>>,
+    collider_query: Query<(&GlobalTransform, &ColliderShape), Without<Ship>>,
 ) {
     for (mut vel, mut ship_tf) in ship_query.iter_mut() {
         let ship_pos = ship_tf.translation;
-        for (island_tf, collider) in island_query.iter() {
-            let island_pos = island_tf.translation;
-            let delta = ship_pos - island_pos;
-            let dist_xz = delta.xz().length();
-            let min_dist = SHIP_COLLISION_RADIUS + collider.radius;
+        let margin = SHIP_COLLISION_RADIUS;
 
-            if dist_xz < min_dist {
-                let push_dir = if dist_xz > 0.001 {
-                    delta.xz().normalize().extend(0.0)
-                } else {
-                    ship_tf.forward().xz().normalize().extend(0.0)
-                };
-                let push_amount = min_dist - dist_xz;
-                ship_tf.translation += push_dir * push_amount;
+        for (global, shape) in collider_query.iter() {
+            if let Some(push) = shape.penetration(
+                global.translation(),
+                global.rotation(),
+                ship_pos,
+                margin,
+            ) {
+                ship_tf.translation += push;
                 ship_tf.translation.y = ship_pos.y;
 
-                let into_island = vel.linear.x * push_dir.x + vel.linear.z * push_dir.z;
-                if into_island < 0.0 {
-                    vel.linear.x -= into_island * push_dir.x;
-                    vel.linear.z -= into_island * push_dir.z;
+                let push_xz = push.xz();
+                if push_xz.length_squared() > 0.0001 {
+                    let push_dir = push_xz.normalize();
+                    let into_island = vel.linear.x * push_dir.x + vel.linear.z * push_dir.y;
+                    if into_island < 0.0 {
+                        vel.linear.x -= into_island * push_dir.x;
+                        vel.linear.z -= into_island * push_dir.y;
+                    }
                 }
             }
         }

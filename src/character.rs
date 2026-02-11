@@ -5,10 +5,15 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 use bevy::input::mouse::AccumulatedMouseMotion;
 
-use crate::islands::IslandCollider;
+use crate::islands::ColliderShape;
+use crate::ocean::OceanSolver;
 use crate::player::{PlayerCamera, PlayerMode};
 
 const CHARACTER_COLLISION_RADIUS: f32 = 0.5;
+const SWIM_SPEED: f32 = 2.5;
+const SWIM_ASCEND_SPEED: f32 = 3.0;
+const SWIM_DESCEND_SPEED: f32 = 2.0;
+const SWIM_DRAG: f32 = 4.0;
 
 #[derive(Component)]
 pub struct MarineCharacter {
@@ -34,9 +39,9 @@ impl Plugin for CharacterPlugin {
             .add_systems(
                 Update,
                 (
-                    character_mouse_look.run_if(|mode: Res<PlayerMode>| !mode.in_boat),
-                    character_movement.run_if(|mode: Res<PlayerMode>| !mode.in_boat),
-                    character_island_collision.run_if(|mode: Res<PlayerMode>| !mode.in_boat),
+                    character_mouse_look.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
+                    character_movement.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
+                    character_island_collision.run_if(|mode: Res<PlayerMode>| !mode.in_vehicle()),
                 ),
             );
     }
@@ -61,6 +66,14 @@ fn spawn_character(
             Camera3d::default(),
             bevy::render::view::Hdr,
             bevy::core_pipeline::tonemapping::Tonemapping::AgX,
+            bevy::core_pipeline::prepass::DepthPrepass,
+            bevy::post_process::bloom::Bloom::NATURAL,
+            bevy::render::view::ColorGrading::default(),
+            bevy::pbr::DistanceFog {
+                color: Color::srgba(0.5, 0.6, 0.8, 0.2),
+                falloff: bevy::pbr::FogFalloff::Exponential { density: 0.008 },
+                ..default()
+            },
             PlayerCamera,
             Transform::from_xyz(0.0, 0.9, 0.0),
         )],
@@ -88,43 +101,88 @@ fn character_mouse_look(
 
 fn character_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
+    ocean: Res<OceanSolver>,
     mut query: Query<(&MarineCharacter, &mut CharacterVelocity, &mut Transform)>,
     time: Res<Time>,
 ) {
+    let dt = time.delta_secs();
     for (char, mut vel, mut transform) in query.iter_mut() {
-        vel.0.y -= 9.8 * time.delta_secs();
+        let pos = transform.translation;
+        let wave_height = ocean.wave_height_at(pos);
+        let underwater = pos.y < wave_height - 0.1;
 
-        if keyboard.just_pressed(KeyCode::Space) {
-            vel.0.y = char.jump_velocity;
-        }
+        if underwater {
+            // Swimming: no gravity, Space ascend, Shift descend, WASD swim
+            vel.0.y *= 1.0 - SWIM_DRAG * dt;
 
-        let mut input = Vec3::ZERO;
-        if keyboard.pressed(KeyCode::KeyW) {
-            input.z -= 1.0;
-        }
-        if keyboard.pressed(KeyCode::KeyS) {
-            input.z += 1.0;
-        }
-        if keyboard.pressed(KeyCode::KeyA) {
-            input.x -= 1.0;
-        }
-        if keyboard.pressed(KeyCode::KeyD) {
-            input.x += 1.0;
-        }
+            if keyboard.pressed(KeyCode::Space) {
+                vel.0.y += SWIM_ASCEND_SPEED * dt;
+            }
+            if keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight) {
+                vel.0.y -= SWIM_DESCEND_SPEED * dt;
+            }
+            vel.0.y = vel.0.y.clamp(-SWIM_DESCEND_SPEED * 2.0, SWIM_ASCEND_SPEED * 2.0);
 
-        if input.length_squared() > 0.0 {
-            let dir = transform.rotation * input.normalize();
-            vel.0.x = dir.x * char.walk_speed;
-            vel.0.z = dir.z * char.walk_speed;
+            let mut input = Vec3::ZERO;
+            if keyboard.pressed(KeyCode::KeyW) {
+                input.z -= 1.0;
+            }
+            if keyboard.pressed(KeyCode::KeyS) {
+                input.z += 1.0;
+            }
+            if keyboard.pressed(KeyCode::KeyA) {
+                input.x -= 1.0;
+            }
+            if keyboard.pressed(KeyCode::KeyD) {
+                input.x += 1.0;
+            }
+
+            if input.length_squared() > 0.0 {
+                let dir = transform.rotation * input.normalize();
+                vel.0.x = dir.x * SWIM_SPEED;
+                vel.0.z = dir.z * SWIM_SPEED;
+            } else {
+                vel.0.x *= 1.0 - SWIM_DRAG * dt;
+                vel.0.z *= 1.0 - SWIM_DRAG * dt;
+            }
         } else {
-            vel.0.x *= 0.9;
-            vel.0.z *= 0.9;
+            // Walking: gravity, jump, WASD
+            vel.0.y -= 9.8 * dt;
+
+            if keyboard.just_pressed(KeyCode::Space) {
+                vel.0.y = char.jump_velocity;
+            }
+
+            let mut input = Vec3::ZERO;
+            if keyboard.pressed(KeyCode::KeyW) {
+                input.z -= 1.0;
+            }
+            if keyboard.pressed(KeyCode::KeyS) {
+                input.z += 1.0;
+            }
+            if keyboard.pressed(KeyCode::KeyA) {
+                input.x -= 1.0;
+            }
+            if keyboard.pressed(KeyCode::KeyD) {
+                input.x += 1.0;
+            }
+
+            if input.length_squared() > 0.0 {
+                let dir = transform.rotation * input.normalize();
+                vel.0.x = dir.x * char.walk_speed;
+                vel.0.z = dir.z * char.walk_speed;
+            } else {
+                vel.0.x *= 0.9;
+                vel.0.z *= 0.9;
+            }
         }
 
-        transform.translation += vel.0 * time.delta_secs();
+        transform.translation += vel.0 * dt;
 
-        if transform.translation.y < 0.9 {
-            transform.translation.y = 0.9;
+        // Floor at seafloor
+        const FLOOR_Y: f32 = -80.0;
+        if transform.translation.y < FLOOR_Y {
+            transform.translation.y = FLOOR_Y;
             vel.0.y = 0.0;
         }
     }
@@ -132,30 +190,30 @@ fn character_movement(
 
 fn character_island_collision(
     mut char_query: Query<(&mut CharacterVelocity, &mut Transform), With<MarineCharacter>>,
-    island_query: Query<(&Transform, &IslandCollider), Without<MarineCharacter>>,
+    collider_query: Query<(&GlobalTransform, &ColliderShape), Without<MarineCharacter>>,
 ) {
     for (mut vel, mut char_tf) in char_query.iter_mut() {
         let char_pos = char_tf.translation;
-        for (island_tf, collider) in island_query.iter() {
-            let island_pos = island_tf.translation;
-            let delta = char_pos - island_pos;
-            let dist_xz = delta.xz().length();
-            let min_dist = CHARACTER_COLLISION_RADIUS + collider.radius;
+        let margin = CHARACTER_COLLISION_RADIUS;
 
-            if dist_xz < min_dist {
-                let push_dir = if dist_xz > 0.001 {
-                    Vec3::new(delta.x / dist_xz, 0.0, delta.z / dist_xz)
-                } else {
-                    Vec3::new(1.0, 0.0, 0.0)
-                };
-                let push_amount = min_dist - dist_xz;
-                char_tf.translation += push_dir * push_amount;
+        for (global, shape) in collider_query.iter() {
+            if let Some(push) = shape.penetration(
+                global.translation(),
+                global.rotation(),
+                char_pos,
+                margin,
+            ) {
+                char_tf.translation += push;
                 char_tf.translation.y = char_pos.y;
 
-                let into_island = vel.0.x * push_dir.x + vel.0.z * push_dir.z;
-                if into_island < 0.0 {
-                    vel.0.x -= into_island * push_dir.x;
-                    vel.0.z -= into_island * push_dir.z;
+                let push_xz = push.xz();
+                if push_xz.length_squared() > 0.0001 {
+                    let push_dir = push_xz.normalize();
+                    let into_island = vel.0.x * push_dir.x + vel.0.z * push_dir.y;
+                    if into_island < 0.0 {
+                        vel.0.x -= into_island * push_dir.x;
+                        vel.0.z -= into_island * push_dir.y;
+                    }
                 }
             }
         }
