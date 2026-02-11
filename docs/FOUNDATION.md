@@ -148,8 +148,9 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 | `scatter.rs` | Rocks, seaweed, debris, buoys |
 | `marine_snow.rs` | Underwater particles |
 | `save_load.rs` | F5/F9 persistence |
-| `artifacts.rs` | Artifacts, inventory |
+| `artifacts.rs` | Artifacts, inventory, inventory UI |
 | `audio.rs` | Pickup sound |
+| `settings.rs` | InputBindings, GameSettings |
 
 ---
 
@@ -159,16 +160,16 @@ Enforces "sub required for deep" per DESIGN.md. No hard block; swimming possible
 
 | Area | Status | Notes |
 |------|--------|------|
-| **Inventory UI** | Missing | Inventory exists but no HUD display |
-| **Save inventory** | Missing | SaveData omits Inventory; add to SaveData |
+| **Inventory UI** | Done | Bottom-right panel when items; lists count + names |
+| **Save inventory** | Done | SaveData.inventory_items; restored on load |
 | **Heavy artifacts** | Partial | Current: pickup + despawn. Design: attach to winch, reel up |
 
 ### Medium Priority (Polish)
 
 | Area | Status | Notes |
 |------|--------|------|
-| **Input mapping** | Missing | Raw KeyCode; no bindings UI |
-| **Settings** | Missing | Volume, sensitivity |
+| **Input mapping** | Done | InputBindings resource; all systems use it |
+| **Settings** | Done | GameSettings.mouse_sensitivity |
 | **Pickup sound** | Optional | Add assets/audio/pickup.ogg to enable |
 
 ### Content (VISION Phases)

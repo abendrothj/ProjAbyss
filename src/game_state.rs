@@ -3,6 +3,8 @@
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
+use crate::settings::InputBindings;
+
 #[derive(States, Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum GameState {
     #[default]
@@ -143,9 +145,10 @@ fn despawn_pause_overlay(
 
 fn menu_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if keyboard.just_pressed(KeyCode::Enter) || keyboard.just_pressed(KeyCode::KeyE)
+    if keyboard.just_pressed(bindings.menu_start) || keyboard.just_pressed(bindings.interact)
     {
         next_state.set(GameState::Playing);
     }
@@ -153,9 +156,10 @@ fn menu_input(
 
 fn pause_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
-    if keyboard.just_pressed(KeyCode::Escape) {
+    if keyboard.just_pressed(bindings.pause) {
         next_state.set(GameState::Playing);
     }
 }
@@ -177,11 +181,12 @@ fn release_cursor(mut query: Query<&mut CursorOptions, With<PrimaryWindow>>) {
 /// Escape toggles pause when Playing. Call from cursor_toggle or a dedicated system.
 pub fn handle_escape_pause(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     state: Res<State<GameState>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut query: Query<&mut CursorOptions, With<PrimaryWindow>>,
 ) {
-    if !keyboard.just_pressed(KeyCode::Escape) {
+    if !keyboard.just_pressed(bindings.pause) {
         return;
     }
     match state.get() {

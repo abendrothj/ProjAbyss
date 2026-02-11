@@ -7,7 +7,9 @@ use crate::character::MarineCharacter;
 use crate::player::PlayerCamera;
 use serde::{Deserialize, Serialize};
 
+use crate::artifacts::Inventory;
 use crate::diving_bell::Submersible;
+use crate::settings::InputBindings;
 use crate::game_state::GameState;
 use crate::player::PlayerMode;
 use crate::ship::Ship;
@@ -22,6 +24,8 @@ pub struct SaveData {
     pub character: EntitySave,
     pub player_mode: PlayerModeSave,
     pub winch_cable_length: f32,
+    #[serde(default)]
+    pub inventory_items: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Copy)]
@@ -61,13 +65,15 @@ impl EntitySave {
 
 fn save_system(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     ship_query: Query<(&Transform, &Velocity), With<Ship>>,
     sub_query: Query<(&Transform, &Velocity), With<Submersible>>,
     character_query: Query<&Transform, With<MarineCharacter>>,
     mode: Res<PlayerMode>,
     winch: Res<WinchState>,
+    inventory: Res<Inventory>,
 ) {
-    if !keyboard.just_pressed(KeyCode::F5) {
+    if !keyboard.just_pressed(bindings.save) {
         return;
     }
 
@@ -123,6 +129,7 @@ fn save_system(
             in_submersible: mode.in_submersible,
         },
         winch_cable_length: winch.cable_length,
+        inventory_items: inventory.items.clone(),
     };
 
     if let Ok(s) = ron::ser::to_string_pretty(&data, ron::ser::PrettyConfig::default()) {
@@ -134,16 +141,18 @@ fn save_system(
 
 fn load_system(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut ship_query: Query<(&mut Transform, &mut Velocity), With<Ship>>,
     mut sub_query: Query<(&mut Transform, &mut Velocity), With<Submersible>>,
     mut character_query: Query<&mut Transform, With<MarineCharacter>>,
     mut mode: ResMut<PlayerMode>,
     mut winch: ResMut<WinchState>,
+    mut inventory: ResMut<Inventory>,
     mut commands: Commands,
     camera_query: Query<Entity, With<PlayerCamera>>,
     character_entity_query: Query<Entity, With<MarineCharacter>>,
 ) {
-    if !keyboard.just_pressed(KeyCode::F9) {
+    if !keyboard.just_pressed(bindings.load) {
         return;
     }
 
@@ -177,6 +186,7 @@ fn load_system(
     mode.in_boat = data.player_mode.in_boat;
     mode.in_submersible = data.player_mode.in_submersible;
     winch.cable_length = data.winch_cable_length.clamp(5.0, 100.0);
+    inventory.items = data.inventory_items.clone();
 
     // Put camera on character (simplest: always load as on-foot for camera; positions are restored)
     let Some(cam_id) = camera_query.iter().next() else { return };

@@ -9,6 +9,7 @@ use bevy::ui::{AlignItems, FlexDirection, JustifyContent};
 use bevy_rapier3d::prelude::*;
 use crate::game_state::GameState;
 use crate::interaction::{Interactable, InteractKind};
+use crate::settings::InputBindings;
 use crate::ocean::OceanSolver;
 use crate::player::{PlayerMode, VEHICLE_ENTER_RANGE};
 use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
@@ -209,26 +210,27 @@ fn submersible_movement(
 
 fn submersible_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut query: Query<&mut Submersible>,
 ) {
     for mut sub in query.iter_mut() {
-        sub.current_throttle = if keyboard.pressed(KeyCode::KeyW) {
+        sub.current_throttle = if keyboard.pressed(bindings.forward) {
             1.0
-        } else if keyboard.pressed(KeyCode::KeyS) {
+        } else if keyboard.pressed(bindings.back) {
             -1.0
         } else {
             0.0
         };
-        sub.current_steering = if keyboard.pressed(KeyCode::KeyA) {
+        sub.current_steering = if keyboard.pressed(bindings.left) {
             1.0
-        } else if keyboard.pressed(KeyCode::KeyD) {
+        } else if keyboard.pressed(bindings.right) {
             -1.0
         } else {
             0.0
         };
-        sub.current_vertical = if keyboard.pressed(KeyCode::Space) {
+        sub.current_vertical = if keyboard.pressed(bindings.ascend) {
             1.0
-        } else if keyboard.pressed(KeyCode::ShiftLeft) {
+        } else if keyboard.pressed(bindings.descend) {
             -1.0
         } else {
             0.0

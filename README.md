@@ -41,7 +41,8 @@ cargo run
 | `character.rs` | First-person, swim, oxygen, pressure, respawn |
 | `player.rs` | Mode switching, camera, prompts, depth color/fog |
 | `save_load.rs` | F5 save, F9 load (save.ron) |
-| `artifacts.rs` | Artifacts, inventory |
+| `artifacts.rs` | Artifacts, inventory, inventory UI |
+| `settings.rs` | InputBindings, GameSettings |
 | `audio.rs` | Pickup sound (add assets/audio/pickup.ogg) |
 | `islands.rs` | Organic blobs, compound shapes, FBM noise |
 | `scatter.rs` | Rocks, seaweed, debris, buoys |

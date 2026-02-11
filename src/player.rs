@@ -16,6 +16,7 @@ use crate::interaction::{
     nearest_interactable_in_range, nearest_interactable_out_of_range, Interactable, InteractKind,
 };
 use crate::ocean::SEA_LEVEL;
+use crate::settings::InputBindings;
 
 /// Distance (m) at which E can enter ship or sub.
 pub const VEHICLE_ENTER_RANGE: f32 = 6.0;
@@ -195,6 +196,7 @@ fn update_interact_prompt(
 
 fn toggle_boat_enter(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut mode: ResMut<PlayerMode>,
     mut inventory: ResMut<Inventory>,
     mut pickup_events: MessageWriter<ArtifactPickupEvent>,
@@ -203,7 +205,7 @@ fn toggle_boat_enter(
     character_query: Query<(Entity, &Transform), With<MarineCharacter>>,
     interactable_query: Query<(Entity, &Transform, &Interactable)>,
 ) {
-    if !keyboard.just_pressed(KeyCode::KeyE) {
+    if !keyboard.just_pressed(bindings.interact) {
         return;
     }
 

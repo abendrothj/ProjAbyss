@@ -8,6 +8,7 @@ use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use crate::diving_bell::Submersible;
 use crate::game_state::GameState;
+use crate::settings::InputBindings;
 use crate::player::PlayerMode;
 use crate::ship::Ship;
 
@@ -75,11 +76,12 @@ fn spawn_winch_joint(
 
 fn winch_controls(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut winch: ResMut<WinchState>,
     time: Res<Time>,
 ) {
-    let reel_in = keyboard.pressed(KeyCode::KeyR);
-    let reel_out = keyboard.pressed(KeyCode::KeyT);
+    let reel_in = keyboard.pressed(bindings.reel_in);
+    let reel_out = keyboard.pressed(bindings.reel_out);
     let delta = time.delta_secs() * REEL_SPEED;
 
     if reel_in && !reel_out {

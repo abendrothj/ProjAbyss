@@ -11,6 +11,7 @@ use bevy_rapier3d::prelude::*;
 use crate::game_state::GameState;
 use crate::ocean::{OceanSolver, SEA_LEVEL};
 use crate::player::{PlayerCamera, PlayerMode};
+use crate::settings::{GameSettings, InputBindings};
 use crate::world::{character_respawn_position, MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
 
 /// Deck offset from ship center (character stands on ship).
@@ -238,6 +239,7 @@ fn update_character_oxygen_ui(
 
 fn character_mouse_look(
     mouse_motion: Res<AccumulatedMouseMotion>,
+    settings: Res<GameSettings>,
     mut query: Query<(&mut CharacterLook, &mut Transform), With<MarineCharacter>>,
 ) {
     let delta = mouse_motion.delta;
@@ -245,10 +247,10 @@ fn character_mouse_look(
         return;
     }
 
-    const SENSITIVITY: f32 = 0.002;
+    let sensitivity = settings.mouse_sensitivity;
     for (mut look, mut transform) in query.iter_mut() {
-        look.yaw -= delta.x * SENSITIVITY;
-        look.pitch -= delta.y * SENSITIVITY;
+        look.yaw -= delta.x * sensitivity;
+        look.pitch -= delta.y * sensitivity;
         look.pitch = look.pitch.clamp(-FRAC_PI_2 + 0.01, FRAC_PI_2 - 0.01);
 
         transform.rotation = Quat::from_euler(EulerRot::YXZ, look.yaw, look.pitch, 0.0);
@@ -257,6 +259,7 @@ fn character_mouse_look(
 
 fn character_movement(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     ocean: Res<OceanSolver>,
     mut query: Query<(
         &MarineCharacter,
@@ -280,25 +283,25 @@ fn character_movement(
             vel.0.y -= sink_rate * dt;
             vel.0.y *= 1.0 - SWIM_DRAG * dt;
 
-            if keyboard.pressed(KeyCode::Space) {
+            if keyboard.pressed(bindings.ascend) {
                 vel.0.y += SWIM_ASCEND_SPEED * dt;
             }
-            if keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight) {
+            if keyboard.pressed(bindings.descend) {
                 vel.0.y -= SWIM_DESCEND_SPEED * dt;
             }
             vel.0.y = vel.0.y.clamp(-SWIM_DESCEND_SPEED * 2.0, SWIM_ASCEND_SPEED * 2.0);
 
             let mut input = Vec3::ZERO;
-            if keyboard.pressed(KeyCode::KeyW) {
+            if keyboard.pressed(bindings.forward) {
                 input.z -= 1.0;
             }
-            if keyboard.pressed(KeyCode::KeyS) {
+            if keyboard.pressed(bindings.back) {
                 input.z += 1.0;
             }
-            if keyboard.pressed(KeyCode::KeyA) {
+            if keyboard.pressed(bindings.left) {
                 input.x -= 1.0;
             }
-            if keyboard.pressed(KeyCode::KeyD) {
+            if keyboard.pressed(bindings.right) {
                 input.x += 1.0;
             }
 
@@ -314,21 +317,21 @@ fn character_movement(
             // Walking: gravity, jump, WASD
             vel.0.y -= 9.8 * dt;
 
-            if keyboard.just_pressed(KeyCode::Space) {
+            if keyboard.just_pressed(bindings.jump) {
                 vel.0.y = char.jump_velocity;
             }
 
             let mut input = Vec3::ZERO;
-            if keyboard.pressed(KeyCode::KeyW) {
+            if keyboard.pressed(bindings.forward) {
                 input.z -= 1.0;
             }
-            if keyboard.pressed(KeyCode::KeyS) {
+            if keyboard.pressed(bindings.back) {
                 input.z += 1.0;
             }
-            if keyboard.pressed(KeyCode::KeyA) {
+            if keyboard.pressed(bindings.left) {
                 input.x -= 1.0;
             }
-            if keyboard.pressed(KeyCode::KeyD) {
+            if keyboard.pressed(bindings.right) {
                 input.x += 1.0;
             }
 

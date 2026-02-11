@@ -8,6 +8,7 @@ use bevy::scene::SceneRoot;
 use bevy_rapier3d::prelude::*;
 use crate::game_state::GameState;
 use crate::interaction::{Interactable, InteractKind};
+use crate::settings::InputBindings;
 use crate::ocean::OceanSolver;
 use crate::player::{PlayerMode, VEHICLE_ENTER_RANGE};
 use crate::world::{MAP_SCALE_FROM_LEGACY, SPAWN_ISLAND_X, SPAWN_ISLAND_Z};
@@ -162,19 +163,20 @@ fn ship_mouse_look(
 
 fn ship_input(
     keyboard: Res<ButtonInput<KeyCode>>,
+    bindings: Res<InputBindings>,
     mut query: Query<&mut Ship, With<Ship>>,
 ) {
     for mut ship in query.iter_mut() {
-        ship.current_throttle = if keyboard.pressed(KeyCode::KeyW) {
+        ship.current_throttle = if keyboard.pressed(bindings.forward) {
             1.0
-        } else if keyboard.pressed(KeyCode::KeyS) {
+        } else if keyboard.pressed(bindings.back) {
             -1.0
         } else {
             0.0
         };
-        ship.current_steering = if keyboard.pressed(KeyCode::KeyA) {
+        ship.current_steering = if keyboard.pressed(bindings.left) {
             1.0
-        } else if keyboard.pressed(KeyCode::KeyD) {
+        } else if keyboard.pressed(bindings.right) {
             -1.0
         } else {
             0.0
